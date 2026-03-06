@@ -198,6 +198,7 @@ input[type='range'] {
   padding: 1.5rem 1rem;
   gap: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ─── Cassette Carousel ────────────────────────────────────── */
@@ -804,4 +805,649 @@ input[type='range'] {
   color: var(--text-dim);
   opacity: 0.5;
   text-align: right;
+}
+
+/* ─── New Player (Figma design) ────────────────────────────── */
+
+/* Container */
+.np-player {
+  position: relative;
+  width: 865px;
+  height: 530px;
+  flex-shrink: 0;
+  font-family: 'Kode Mono', monospace;
+}
+
+/* Outer body shadow */
+.np-body-shadow {
+  position: absolute;
+  left: 0; top: 4px;
+  width: 865px; height: 547px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Back panel textures — rotate-180 as in Figma */
+.np-back-panel {
+  position: absolute;
+  pointer-events: none;
+  transform: rotate(180deg);
+  transform-origin: center;
+}
+.np-back-panel--1 {
+  left: 1px; top: 10px; width: 824px; height: 513px;
+}
+.np-back-panel--2 {
+  left: 1px; top: 8px; width: 824px; height: 508px;
+}
+
+/* Horizontal divider lines */
+.np-divider {
+  position: absolute;
+  pointer-events: none;
+  left: 0; width: 824px; height: 1px;
+}
+.np-divider--top  { top: 96px; }
+.np-divider--bottom { top: 427px; }
+.np-divider-center {
+  position: absolute;
+  pointer-events: none;
+  left: 192px; top: 292px; width: 441px; height: 1px;
+}
+
+/* Three cream panels */
+.np-panel {
+  position: absolute;
+  background: #dbddd0;
+  border-radius: 7px;
+  height: 352px;
+  top: 25px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.25),
+    inset -1px -1px 0.5px rgba(0,0,0,0.25),
+    inset 1px 1px 0.5px rgba(255,255,255,0.7);
+}
+.np-panel--left   { left: 18px;  width: 161px; }
+.np-panel--center { left: 192px; width: 441px; }
+.np-panel--right  { left: 650px; width: 161px; }
+
+/* Button area shadow */
+.np-btn-shadow {
+  position: absolute;
+  left: 209px; top: 416px;
+  width: 409px; height: 89px;
+  background: black;
+  box-shadow: 0px 0px 9px 6px black;
+  z-index: 1;
+}
+
+/* Button guard elevation sides */
+.np-btn-guard-elev {
+  position: absolute;
+  width: 57px;
+  height: 107px;
+  top: 417px;
+  pointer-events: none;
+}
+.np-btn-guard-elev--right { left: 581px; transform: rotate(180deg); }
+.np-btn-guard-elev--left  { left: 188px; transform: scaleY(-1); }
+
+/* Logo */
+.np-logo {
+  position: absolute;
+  left: 17px;
+  top: 452px;
+  width: 77px;
+  z-index: 4;
+}
+.np-logo-stripe--red {
+  height: 24px;
+  background: #f43c4e;
+  border-radius: 5px 5px 0 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 3px 4px;
+}
+.np-logo-stripe--tan {
+  height: 18px;
+  background: #daa067;
+  display: flex;
+  align-items: center;
+  padding-left: 5px;
+}
+.np-logo-stripe--teal {
+  height: 7px;
+  background: #00bab9;
+  border-radius: 0 0 5px 5px;
+}
+/* imgGroup10 = the two reel icons, 46×18px, rotated 180° in Figma */
+.np-logo-icon {
+  width: 46px;
+  height: 18px;
+  object-fit: contain;
+  transform: rotate(180deg);
+  flex-shrink: 0;
+}
+.np-logo-text {
+  font-family: 'Kode Mono', monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: #000;
+  letter-spacing: -0.75px;
+  white-space: nowrap;
+  text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.25);
+}
+
+/* Generic label */
+.np-label {
+  position: absolute;
+  font-family: 'Kode Mono', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  color: #000;
+  text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.25);
+  white-space: nowrap;
+}
+
+/* dB meter */
+.np-db-label { left: 55px; top: 36px; }
+
+.np-db-frame {
+  position: absolute;
+  left: 37px; top: 53px;
+  width: 52px; height: 303px;
+  background: #272222;
+  border-radius: 4px;
+  box-shadow: inset 2px 0 2px rgba(0,0,0,0.9);
+  overflow: hidden;
+}
+
+.np-db-axis {
+  position: absolute;
+  left: 36px; top: 3px;
+  width: 1px; height: 95%;
+  object-fit: cover;
+}
+
+.np-db-num {
+  position: absolute;
+  right: 20px;
+  font-family: 'Kode Mono', monospace;
+  font-size: 10px;
+  color: #fff;
+  line-height: 1;
+  transform: translateY(calc(-50% + 8px));
+}
+
+.np-db-tick {
+  position: absolute;
+  right: 10px;
+  width: 7px;
+  height: 1px;
+  object-fit: cover;
+  transform: translateY(calc(-50% + 8px));
+}
+
+.np-db-gauge {
+  position: absolute;
+  left: 2px;
+  width: 48px; height: 4px;
+  background: #ff4400;
+  box-shadow: 0 6px 2px rgba(0,0,0,0.7);
+  transition: top 0.1s ease-out;
+}
+
+.np-db-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background: linear-gradient(130.5deg, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0) 42%, rgba(255,255,255,0) 89%);
+}
+
+/* Volume slider */
+.np-vol-label { left: 128px; top: 36px; }
+
+.np-vol-track {
+  position: absolute;
+  left: 131px; top: 53px;
+  width: 17px; height: 303px;
+  border-radius: 24px;
+}
+.np-vol-track-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow: inset 0 0.5px 0 1px rgba(0,0,0,0.25), inset 0 0 4px rgba(0,0,0,0.55);
+}
+.np-vol-track-groove {
+  position: absolute;
+  left: 3px; top: 3px;
+  width: 11px; height: 297px;
+  background: #000;
+  border-radius: 28px;
+}
+.np-vol-ticks-img {
+  position: absolute;
+  left: -20px; top: 6px;
+  width: 13px; height: 290px;
+  pointer-events: none;
+  transform: scaleX(-1);
+}
+
+.np-vol-knob-wrap {
+  position: absolute;
+  left: 112px;
+  width: 66px; height: 44px;
+  z-index: 2;
+  pointer-events: none;
+}
+.np-vol-knob-img {
+  position: absolute;
+  left: -20px; top: -13px;
+  width: 106px; height: 77px;
+  object-fit: contain;
+  pointer-events: none;
+  display: block;
+}
+.np-vol-input {
+  position: absolute;
+  left: 112px; top: 53px;
+  width: 66px; height: 303px;
+  opacity: 0;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  cursor: pointer;
+  z-index: 3;
+}
+
+/* Tape bay */
+.np-tape-bay {
+  position: absolute;
+  left: 208px; top: 42px;
+  width: 409px; height: 242px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.np-tape-bay-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+}
+.np-back-tape {
+  position: absolute;
+  left: 15px; top: 14px;
+  width: 350px; height: 220px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.np-tape-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Kode Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: rgba(255,255,255,0.25);
+}
+
+/* Reels */
+.np-reel {
+  position: absolute;
+  width: 81px; height: 81px;
+}
+.np-reel--left  { left: 87px;  top: 63px; }
+.np-reel--right { left: 233px; top: 63px; }
+
+.np-reel-outer,
+.np-reel-hub,
+.np-reel-spokes,
+.np-reel-c1,
+.np-reel-c2,
+.np-reel-c3 {
+  position: absolute;
+  object-fit: contain;
+}
+.np-reel-outer  { inset: 0; width: 100%; height: 100%; }
+.np-reel-hub    { left: 8px; top: 8px; width: 65px; height: 65px; }
+.np-reel-spokes { left: 27px; top: 33px; width: 49.5px; height: 47px; }
+.np-reel-c1     { left: 21px; top: 24px; width: 29px; height: 29px; }
+.np-reel-c2     { left: 27px; top: 30px; width: 17px; height: 17px; }
+.np-reel-c3     { left: 32px; top: 35px; width: 8px;  height: 8px;  }
+
+/* LCD Screen */
+.np-screen {
+  position: absolute;
+  left: 207px; top: 301px;
+  width: 410px; height: 67px;
+  background: #231e1e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.np-screen-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: row-reverse; /* NOW on right, NEXT on left */
+  gap: 12px;
+  padding: 5px 8px;
+  align-items: stretch;
+}
+.np-screen-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+  align-items: flex-end;
+}
+.np-screen-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+.np-screen-col--now { align-items: flex-start; }
+.np-screen-col--next { align-items: flex-start; }
+
+.np-screen-label {
+  font-size: 8px;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 1px;
+}
+.np-screen-title {
+  font-family: 'Kode Mono', monospace;
+  font-size: 11px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: left;
+  align-self: flex-start;
+}
+.np-screen-title--dim { opacity: 0.5; }
+.np-screen-artist {
+  font-family: 'Kode Mono', monospace;
+  font-size: 9px;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: left;
+  align-self: flex-start;
+}
+.np-screen-artist--dim { opacity: 0.4; }
+
+.np-screen-progress-track {
+  width: 100%;
+  height: 2px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 1px;
+  margin: 2px 0;
+}
+.np-screen-progress-fill {
+  height: 100%;
+  background: #fff;
+  border-radius: 1px;
+  transition: width 0.5s linear;
+}
+.np-screen-time {
+  font-size: 8px;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 0.5px;
+  text-align: right;
+}
+.np-screen-meta {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 2px;
+  border: 0.5px solid rgba(255,255,255,0.4);
+  font-size: 8px;
+  color: #fff;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+.np-screen-meta--empty { opacity: 0.35; border: none; }
+.np-screen-meta--dim { opacity: 0.5; }
+.np-screen-meta--placeholder { visibility: hidden; }
+.np-screen-progress-track--empty { pointer-events: none; }
+.np-meta-sep {
+  width: 0; height: 9px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.np-screen-divider {
+  width: 1px;
+  background: rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+.np-screen-idle {
+  color: rgba(255,255,255,0.3);
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-align: center;
+  width: 100%;
+  margin: auto;
+}
+.np-screen-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+  background: linear-gradient(138deg, rgba(255,255,255,0.12) 32%, rgba(255,255,255,0) 34%, rgba(255,255,255,0) 63%);
+}
+
+/* Button label row — each span is absolutely positioned at its exact Figma x */
+.np-btn-labels {
+  position: absolute;
+  left: 0; top: 397px;
+  width: 100%; height: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.np-btn-labels span {
+  position: absolute;
+  font-family: 'Kode Mono', monospace;
+  font-weight: 700;
+  font-size: 11px;
+  color: #000;
+  text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.25);
+  white-space: nowrap;
+}
+
+/* Button guard overlay */
+/* Container: left=192, top=387, w=442, h=129 */
+/* Image overflows container by 3.1% top/bottom and 0.9% left/right (~4px each side) */
+.np-btn-guard {
+  position: absolute;
+  left: 188px; top: 383px;
+  width: 450px; height: 137px;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Button row */
+.np-buttons {
+  position: absolute;
+  left: 212px; top: 419px;
+  width: 403px; height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+  overflow: hidden;
+}
+.np-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  /* Override global button:disabled opacity — disabled is functional only for now */
+  opacity: 1 !important;
+}
+.np-btn:disabled { cursor: not-allowed; }
+
+/* Fixed-size slot — contains offset layer + moving inner */
+.np-btn-slot {
+  position: relative;
+  height: 92px;
+  overflow: visible;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.np-btn-slot--sm { width: 63px; }
+.np-btn-slot--lg { width: 77px; }
+
+/* Always-visible depth layer behind the button */
+.np-btn-offset {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  transform-origin: top center;
+  transition: transform 180ms cubic-bezier(0.34, 1.9, 0.64, 1);
+}
+.np-btn-slot--pressed .np-btn-offset {
+  transform: scaleY(0.85);
+}
+.np-btn-offset img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Moving part — scales and translates on press */
+.np-btn-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  transform-origin: top center;
+  transition: transform 180ms cubic-bezier(0.34, 1.9, 0.64, 1);
+}
+.np-btn-slot--pressed .np-btn-inner {
+  transform: translateY(3px) scaleY(0.85);
+}
+
+.np-btn-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Gradient overlay — fades in on press */
+.np-btn-gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  mix-blend-mode: multiply;
+  transition: opacity 180ms cubic-bezier(0.34, 1.9, 0.64, 1);
+}
+.np-btn-gradient img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.np-btn-slot--pressed .np-btn-gradient {
+  opacity: 0.6;
+}
+
+/* Speaker */
+.np-speaker {
+  position: absolute;
+  left: 660px; top: 37px;
+  width: 142px; height: 142px;
+  object-fit: contain;
+  transform: rotate(90deg);
+  pointer-events: none;
+}
+
+/* Tape type selector */
+.np-tapetype-label { left: 698px; top: 273px; }
+
+.np-tapetype-frame {
+  position: absolute;
+  left: 666px; top: 292px;
+  width: 130px; height: 49px;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: inset 0 0.5px 0 1px rgba(0,0,0,0.25), inset 0 0 4px rgba(0,0,0,0.55);
+}
+.np-tapetype-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.np-tapetype-inner {
+  position: absolute;
+  inset: 2px;
+  border-radius: 5px;
+}
+.np-tapetype-options {
+  position: absolute;
+  left: 666px; top: 353px;
+  width: 130px;
+  display: flex;
+  justify-content: space-between;
+}
+.np-tapetype-opt {
+  font-family: 'Kode Mono', monospace;
+  font-weight: 700;
+  font-size: 11px;
+  color: #000;
+  cursor: pointer;
+  text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.25);
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.np-tapetype-opt--active { opacity: 1; }
+
+.np-tapetype-knob-wrap {
+  position: absolute;
+  top: 299px;
+  width: 44px; height: 42px;
+  z-index: 2;
+  transition: left 0.2s ease;
+  transform: translateX(-22px);
+}
+.np-tapetype-options {
+  z-index: 3;
+}
+.np-tapetype-knob-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Filter active hint */
+.np-filter-hint {
+  position: absolute;
+  right: 8px; bottom: 8px;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  opacity: 0.7;
 }

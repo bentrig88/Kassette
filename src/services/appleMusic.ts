@@ -62,7 +62,6 @@ export async function fetchLibraryTracks(
     const response = await music.api.music('/v1/me/library/songs', {
       limit,
       offset,
-      include: 'catalog',
     })
 
     const items = response.data.data
@@ -94,13 +93,8 @@ function mapMediaItemToTrack(item: MusicKit.MediaItem): Track {
     ? artwork.url.replace('{w}', '300').replace('{h}', '300')
     : undefined
 
-  // Try playParams.catalogId first (no extra API request needed),
-  // then fall back to the included catalog relationship
   const playParams = (item.attributes as unknown as { playParams?: { catalogId?: string } }).playParams
-  const catalogId: string | undefined =
-    playParams?.catalogId ??
-    (item as unknown as { relationships?: { catalog?: { data?: { id: string }[] } } })
-      .relationships?.catalog?.data?.[0]?.id
+  const catalogId: string | undefined = playParams?.catalogId
 
   return {
     id: item.id,
@@ -266,6 +260,6 @@ export async function playQueueFrom(tracks: Track[], startIndex: number): Promis
     .filter((item): item is MusicKit.MediaItem => item !== undefined)
   if (items.length === 0) return
   await music.setQueue({ items })
-  music.stop()
+  // setQueue already resets playback state — calling stop() before play() confuses MusicKit
   await music.play()
 }

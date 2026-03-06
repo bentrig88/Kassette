@@ -175,7 +175,7 @@ The CassettePlayer LCD screen shows `BPM / NRG / MOD` metadata for the current t
 ## Key Technical Decisions & Findings (Phase 2 additions)
 
 ### MusicKit play() after setQueue
-After calling `setQueue`, MusicKit's PlayActivity is uninitialized. Calling `play()` directly throws *"play() was called without a previous stop() or pause() call"*. Fix: call `music.stop()` first when not in paused state — this synchronously initializes PlayActivity.
+After calling `setQueue`, call `music.play()` directly — do NOT call `music.stop()` first. `setQueue` already resets internal state; an explicit `stop()` puts MusicKit into an invalid state causing *"play() was called without a previous stop() or pause() call"* on the subsequent `play()`.
 
 ### Apple Music Audio Features API
 `GET /v1/catalog/{storefront}/songs/{id}/audio-features` returns 400 "No relationship found matching 'audio-features'". The `include=audio-features` parameter on the songs endpoint is also silently ignored. Audio features are NOT available to standard Apple developer accounts.
@@ -196,7 +196,44 @@ npm run build    # production build
 
 ---
 
+## Phase 3 — Visual Redesign (In Progress)
+
+### Asset Pipeline
+All player images are Figma exports stored in `src/assets/playerAssets.ts` as URL strings.
+URLs expire after 7 days — re-export via the Figma MCP (`get_design_context` on the node) when they stop loading.
+Figma file: `8Q9h4JkKgL8ota7JdW7qrX`, main player node: `40:1219`.
+
+**Important:** Some Figma layers carry a 180° flip internally. When exported the flip is baked into the PNG pixels. If a CSS `transform: rotate(180deg)` is also applied in code, the asset double-flips (inner shadows appear on wrong side). Fix: remove the flip from the Figma layer first, re-export, then remove the CSS transform.
+
+### Figma coordinate conversion
+- Canvas origin: `(451, 354)` — subtract from Figma absolute coords to get player-relative position
+- Player size: `865 × 551 px`
+- Bottom-anchored elements: `player_y = canvas_h - bottom - height - 354`
+
+### Button Press Animation
+Transport buttons have a layered structure inside `.np-btn-slot`:
+1. `.np-btn-offset` — always-visible depth layer behind the button (represents physical thickness). `transform-origin: top center` so it compresses upward on press.
+2. `.np-btn-inner` — the moving button cap. `transform-origin: top center`, `scaleY(0.85) + translateY(3px)` on press.
+3. `.np-btn-gradient` — overlay image that fades in to `opacity: 0.6` on press (`mix-blend-mode: multiply`).
+
+Press state is tracked via `pressedBtn` state + `np-btn-slot--pressed` CSS class on the slot.
+Spring easing: `cubic-bezier(0.34, 1.9, 0.64, 1)` at 180ms for a physical bounce feel.
+
+### Play / Pause Toggle Behaviour
+- **Play**: latches pressed while `playbackState === 'playing'` OR `'paused'`. Clicking while playing calls `music.stop()` (not pause) to avoid accidentally latching the pause button.
+- **Pause**: latches pressed while `playbackState === 'paused'`. Clicking while playing pauses; clicking while paused resumes. Both play + pause can appear pressed simultaneously.
+- **No-flicker rule**: `onMouseUp` only clears `pressedBtn` when the current state is the *source* state (e.g. pause button's mouseup clears only when `playbackState === 'paused'`). Otherwise the state machine transition takes over before pressedBtn is cleared.
+
+### setQueue / play() sequence (updated finding)
+Do NOT call `music.stop()` before `music.play()` after `setQueue`. `setQueue` resets internal state — an explicit `stop()` puts MusicKit into an invalid state, causing "play() called without stop/pause". Call `music.play()` directly.
+
+### Audio Filter (useAudioFilter)
+`createMediaElementSource` is attempted 300ms after `isPlaying` becomes true (delay lets MusicKit finish its own audio setup). Never permanently blocks on error — retries each time `isPlaying` transitions. Detects element swaps between tracks via element reference comparison.
+MutationObserver approach was tried but broke MusicKit's DRM init by firing during `setQueue`. The 300ms delayed `isPlaying` trigger is the correct approach.
+
+---
+
 ## Phases
 - **Phase 1** ✅ — Auth, genre cassettes, player controls, queue, VU meter, tape filter, SFX
 - **Phase 2** ✅ — Preview-based audio analysis, BPM/energy/mood sliders, background analysis, smart queue sorting
-- **Phase 3** — Full visual redesign: proper cassette artwork, insert animation, retro aesthetics
+- **Phase 3** 🚧 — Visual redesign: Figma-matched pixel-perfect UI, physical button animations, asset refresh pipeline

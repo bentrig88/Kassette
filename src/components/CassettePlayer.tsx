@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useRef, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
 import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
@@ -8,6 +8,31 @@ import { useAudioFilter } from '../hooks/useAudioFilter'
 import { useRewindSFX } from '../hooks/useRewindSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
 import type { AudioQuality } from '../types/music'
+import * as A from '../assets/playerAssets'
+
+// dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
+const DB_TICKS = [
+  { label: '3',   y: 3   },
+  { label: '2',   y: 26  },
+  { label: '1',   y: 49  },
+  { label: '0',   y: 72  },
+  { label: '-1',  y: 95  },
+  { label: '-2',  y: 118 },
+  { label: '-3',  y: 141 },
+  { label: '-5',  y: 174 },
+  { label: '-7',  y: 207 },
+  { label: '-10', y: 240 },
+  { label: '-20', y: 286 },
+]
+
+// Volume track tick y offsets relative to vol track top (player y=45)
+const VOL_TICK_Y = [0, 30, 62, 94, 126, 146, 178, 210, 242, 259]
+
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 export function CassettePlayer() {
   const {
@@ -34,10 +59,9 @@ export function CassettePlayer() {
 
   const isPlaying = playbackState === 'playing'
   const bars = useVUMeter(isPlaying)
-  const { filterActive } = useAudioFilter(quality, isPlaying)
+  useAudioFilter(quality, isPlaying)
   const rewindSFX = useRewindSFX()
 
-  // Kept as refs so event-listener closures always read the latest value
   const queuedTracksRef = useRef(queuedTracks)
   queuedTracksRef.current = queuedTracks
   const currentCassetteRef = useRef(currentCassette)
@@ -50,13 +74,8 @@ export function CassettePlayer() {
   // Sync MusicKit events
   useEffect(() => {
     if (!isInserted) return
-
     let music: MusicKit.MusicKitInstance
-    try {
-      music = getMusicKitInstance()
-    } catch {
-      return
-    }
+    try { music = getMusicKitInstance() } catch { return }
 
     const onStateChange = () => {
       const state = music.playbackState
@@ -66,23 +85,16 @@ export function CassettePlayer() {
       else if (state === states.stopped) setPlaybackState('stopped')
       else if (state === states.loading || state === states.waiting) setPlaybackState('loading')
       else if (state === states.completed) {
-        // MusicKit's loaded window is exhausted — advance to next from our sorted queue
         setPlaybackState('stopped')
-        const q = queuedTracksRef.current.length > 0
-          ? queuedTracksRef.current
-          : (currentCassetteRef.current?.tracks ?? [])
+        const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
         const nextIdx = currentTrackIndexRef.current + 1
-        if (nextIdx < q.length) {
-          playQueueFrom(q, nextIdx).catch(() => {})
-        }
+        if (nextIdx < q.length) playQueueFrom(q, nextIdx).catch(() => {})
       }
     }
 
     const onNowPlayingChange = () => {
       const nowId = music.nowPlayingItem?.id
-      const q = queuedTracksRef.current.length > 0
-        ? queuedTracksRef.current
-        : (currentCassetteRef.current?.tracks ?? [])
+      const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
       const idx = nowId ? q.findIndex((t) => t.id === nowId) : -1
       setCurrentTrackIndex(idx >= 0 ? idx : 0)
       setDuration(music.currentPlaybackDuration)
@@ -91,7 +103,6 @@ export function CassettePlayer() {
 
     music.addEventListener('playbackStateDidChange', onStateChange)
     music.addEventListener('nowPlayingItemDidChange', onNowPlayingChange)
-
     return () => {
       music.removeEventListener('playbackStateDidChange', onStateChange)
       music.removeEventListener('nowPlayingItemDidChange', onNowPlayingChange)
@@ -100,10 +111,7 @@ export function CassettePlayer() {
 
   // Poll playback time
   useEffect(() => {
-    if (!isPlaying) {
-      if (tickRef.current) clearInterval(tickRef.current)
-      return
-    }
+    if (!isPlaying) { if (tickRef.current) clearInterval(tickRef.current); return }
     tickRef.current = setInterval(() => {
       try {
         const music = getMusicKitInstance()
@@ -111,350 +119,438 @@ export function CassettePlayer() {
         setDuration(music.currentPlaybackDuration)
       } catch {/* ignore */}
     }, 500)
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current)
-    }
+    return () => { if (tickRef.current) clearInterval(tickRef.current) }
   }, [isPlaying, setCurrentTime, setDuration])
 
-  // Sync volume to MusicKit
+  // Sync volume
   useEffect(() => {
-    try {
-      getMusicKitInstance().volume = volume
-    } catch {/* not yet configured */}
+    try { getMusicKitInstance().volume = volume } catch {/* not yet configured */}
   }, [volume])
 
   async function handlePlay() {
     try {
       const music = getMusicKitInstance()
-      // play() requires PlayActivity to be initialized — calling stop() ensures that.
-      // Skip if already paused (stop() would reset position).
-      if (music.playbackState !== MusicKit.PlaybackStates.paused) {
-        music.stop()
-      }
+      if (playbackState === 'playing') { music.stop(); return }
+      if (playbackState !== 'paused') music.stop()
       await music.play()
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
   function handlePause() {
     try {
-      getMusicKitInstance().pause()
-    } catch {/* */}
-  }
-
-  function handleStop() {
-    try {
       const music = getMusicKitInstance()
-      music.stop()
-      setCurrentTime(0)
+      if (playbackState === 'paused') music.play()
+      else music.pause()
     } catch {/* */}
   }
+  function handleStop() { try { getMusicKitInstance().stop(); setCurrentTime(0) } catch {/* */} }
 
   const fbPressRef = useRef<{ startedAt: number; positionAt: number } | null>(null)
-
-  function getAudioEl() {
-    return document.querySelector('audio') as HTMLAudioElement | null
-  }
-
-  function startFF() {
-    const el = getAudioEl()
-    if (el) el.playbackRate = 8
-  }
-
-  function stopFF() {
-    const el = getAudioEl()
-    if (el) el.playbackRate = 1
-  }
-
+  function getAudioEl() { return document.querySelector('audio') as HTMLAudioElement | null }
+  function startFF() { const el = getAudioEl(); if (el) el.playbackRate = 8 }
+  function stopFF() { const el = getAudioEl(); if (el) el.playbackRate = 1 }
   function startFB() {
-    const el = getAudioEl()
-    if (el) el.muted = true
-    fbPressRef.current = {
-      startedAt: Date.now(),
-      positionAt: getMusicKitInstance().currentPlaybackTime,
-    }
+    const el = getAudioEl(); if (el) el.muted = true
+    fbPressRef.current = { startedAt: Date.now(), positionAt: getMusicKitInstance().currentPlaybackTime }
     rewindSFX.play()
   }
-
   function stopFB() {
     if (!fbPressRef.current) return
     const heldSeconds = (Date.now() - fbPressRef.current.startedAt) / 1000
-    const rewind = heldSeconds * 8
-    const target = Math.max(0, fbPressRef.current.positionAt - rewind)
+    const target = Math.max(0, fbPressRef.current.positionAt - heldSeconds * 8)
     fbPressRef.current = null
-
     rewindSFX.stop(() => {
-      try {
-        getMusicKitInstance().seekToTime(target)
-      } catch {/* */}
-      const el = getAudioEl()
-      if (el) el.muted = false
+      try { getMusicKitInstance().seekToTime(target) } catch {/* */}
+      const el = getAudioEl(); if (el) el.muted = false
     })
   }
-
   async function handleEject() {
-    fbPressRef.current = null
-    stopFF()
-    try {
-      getMusicKitInstance().stop()
-    } catch {/* */}
+    fbPressRef.current = null; stopFF()
+    try { getMusicKitInstance().stop() } catch {/* */}
     ejectCassette()
   }
 
   const featuresMap = usePlayerStore((s) => s.featuresMap)
-
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
   usePreviewAnalysis(displayQueue)
   const currentTrack = displayQueue[currentTrackIndex]
   const currentFeatures: TrackFeatures | undefined = currentTrack ? featuresMap.get(currentTrack.id) : undefined
   const nextTrack = displayQueue[currentTrackIndex + 1]
 
-  // Snap sliders to current track's features — purely informational, does not re-sort
+  // Snap sliders to current track's features on track change
   useEffect(() => {
     if (!currentTrack) return
     const f = featuresMap.get(currentTrack.id)
     if (!f) return
-    const bpmNorm = Math.round(Math.min(100, Math.max(0, ((f.bpm - 60) / 120) * 100)))
-    setTempoFilter(bpmNorm)
+    setTempoFilter(Math.round(Math.min(100, Math.max(0, ((f.bpm - 60) / 120) * 100))))
     setEnergyFilter(f.energy)
     setMoodFilter(f.mood)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id, setTempoFilter, setEnergyFilter, setMoodFilter])
 
+  const progress = duration > 0 ? currentTime / duration : 0
+  // Reel rotation: left reel unwinds (tape moving off), right reel winds up
+  const leftDeg = progress * 360
+  const rightDeg = (1 - progress) * 360
+
+  // VU meter: average bar value → dB gauge position
+  // dB frame: y=45, h=303. Gauge is 4px tall. At silence: bottom of frame. At peak: top.
+  const avgVU = useMemo(() => bars.reduce((a, b) => a + b, 0) / (bars.length || 1), [bars])
+  const scaledVU = Math.min(1, Math.pow(avgVU * 4, 0.5)) * volume
+  const gaugeY = (1 - scaledVU) * 230
+
+  // Volume knob: track y=53, h=303, knob h=44. Top=max vol, bottom=min vol.
+  const volKnobY = 53 + (1 - volume) * 280
+
+  // Tape type knob snap positions
+  const snapPositions: Record<AudioQuality, number> = { lo: 692, mid: 730, hi: 772 }
   const qualityLabels: AudioQuality[] = ['lo', 'mid', 'hi']
 
-  const progress = duration > 0 ? currentTime / duration : 0
-  const leftRotation = isPlaying ? progress * 360 : 0
-  const rightRotation = isPlaying ? (1 - progress) * 360 : 0
+  const [pressedBtn, setPressedBtn] = useState<string | null>(null)
+  const [knobDragX, setKnobDragX] = useState<number | null>(null)
+  const knobDragRef = useRef<{ startX: number; startKnobX: number } | null>(null)
+
+  function onKnobMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    knobDragRef.current = { startX: e.clientX, startKnobX: snapPositions[quality] }
+    const onMove = (ev: MouseEvent) => {
+      if (!knobDragRef.current) return
+      const delta = ev.clientX - knobDragRef.current.startX
+      setKnobDragX(Math.min(772, Math.max(692, knobDragRef.current.startKnobX + delta)))
+    }
+    const onUp = (ev: MouseEvent) => {
+      if (!knobDragRef.current) return
+      const rawX = knobDragRef.current.startKnobX + (ev.clientX - knobDragRef.current.startX)
+      const snapped = ([692, 730, 772] as const).reduce((a, b) =>
+        Math.abs(b - rawX) < Math.abs(a - rawX) ? b : a
+      )
+      const qualityMap: Record<number, AudioQuality> = { 692: 'lo', 730: 'mid', 772: 'hi' }
+      setQuality(qualityMap[snapped])
+      setKnobDragX(null)
+      knobDragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const tapeKnobX = knobDragX ?? snapPositions[quality]
 
   return (
-    <div className="player-wrapper">
-      <div className="player-body">
-        {/* Left panel: VU meter + Volume */}
-        <div className="player-left">
-          <div className="vu-label">VU</div>
-          <div className="vu-meter">
-            {bars.map((val, i) => (
-              <div
-                key={i}
-                className={`vu-bar ${val > 0.8 ? 'vu-bar--red' : val > 0.6 ? 'vu-bar--yellow' : 'vu-bar--green'}`}
-                style={{ height: `${val * 100}%` }}
-              />
-            ))}
-          </div>
-          <div className="vu-db-labels">
-            <span>+3</span>
-            <span>0</span>
-            <span>-3</span>
-            <span>-7</span>
-            <span>-10</span>
-          </div>
-          <div className="volume-section">
-            <span className="volume-label">VOL</span>
-            <input
-              type="range"
-              className="volume-slider"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-            />
-          </div>
+    <div className="np-player">
+
+      {/* ── Outer body shadow ────────────────────────────── */}
+      <img src={A.imgVector9} alt="" className="np-body-shadow" />
+
+      {/* ── Background body panels (rotate-180 as in Figma) ─ */}
+      <img src={A.imgBackPanel} alt="" className="np-back-panel np-back-panel--1" />
+      <img src={A.imgBackPanel1} alt="" className="np-back-panel np-back-panel--2" />
+
+      {/* Horizontal divider lines */}
+      <img src={A.imgLines} alt="" className="np-divider np-divider--top" />
+      <img src={A.imgLines} alt="" className="np-divider np-divider--bottom" />
+
+      {/* Three cream panels */}
+      <div className="np-panel np-panel--left" />
+      <div className="np-panel np-panel--center" />
+      <div className="np-panel np-panel--right" />
+
+      {/* Center divider line */}
+      <img src={A.imgLines1} alt="" className="np-divider-center" />
+
+      {/* Button area drop shadow */}
+      <div className="np-btn-shadow" />
+
+      {/* Button guard elevations (left/right of button area) */}
+      <img src={A.imgButtonsGuardElevLeft} alt="" className="np-btn-guard-elev np-btn-guard-elev--right" />
+      <img src={A.imgButtonsGuardElevLeft1} alt="" className="np-btn-guard-elev np-btn-guard-elev--left" />
+
+      {/* ── LOGO (bottom-left) ──────────────────────────── */}
+      <div className="np-logo">
+        <div className="np-logo-stripe np-logo-stripe--red">
+          <img src={A.imgGroup10} alt="" className="np-logo-icon" />
         </div>
-
-        {/* Center: Tape bay */}
-        <div className="player-center">
-          <AnimatePresence>
-            {isInserted && currentCassette ? (
-              <motion.div
-                key="tape"
-                className="tape-bay"
-                initial={{ y: -80, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -80, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 22 }}
-              >
-                <div className="tape-body" style={{ borderColor: currentCassette.color }}>
-                  <div className="tape-label" style={{ backgroundColor: currentCassette.color }}>
-                    <span className="tape-genre-text">{currentCassette.genre}</span>
-                  </div>
-                  <div className="tape-reels-row">
-                    <motion.div
-                      className="tape-reel"
-                      animate={{ rotate: isPlaying ? leftRotation : 0 }}
-                      transition={{ duration: 0.5, ease: 'linear' }}
-                    />
-                    <div className="tape-window" />
-                    <motion.div
-                      className="tape-reel"
-                      animate={{ rotate: isPlaying ? rightRotation : 0 }}
-                      transition={{ duration: 0.5, ease: 'linear' }}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="empty"
-                className="tape-bay tape-bay--empty"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <span className="tape-bay-hint">No tape inserted</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Progress bar */}
-          <div className="progress-bar-container">
-            <div className="progress-bar" style={{ width: `${progress * 100}%` }} />
-          </div>
-
-          {/* Quality selector */}
-          <div className="quality-selector">
-            <span className="quality-label">
-              TAPE TYPE{isPlaying && !filterActive ? ' (visual only)' : ''}
-            </span>
-            <div className="quality-buttons">
-              {qualityLabels.map((q) => (
-                <button
-                  key={q}
-                  className={`quality-btn ${quality === q ? 'quality-btn--active' : ''}`}
-                  onClick={() => setQuality(q)}
-                >
-                  {q.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="np-logo-stripe np-logo-stripe--tan">
+          <span className="np-logo-text">KASSETTE</span>
         </div>
-
-        {/* Right panel: Track display + speaker */}
-        <div className="player-right">
-          <div className="track-display">
-            <div className="track-display-screen">
-              {currentTrack ? (
-                <>
-                  <div className="track-now">
-                    <span className="track-label">NOW</span>
-                    <div className="track-name-scroll">
-                      <span>{currentTrack.name}</span>
-                    </div>
-                    <div className="track-artist">{currentTrack.artistName}</div>
-                    {currentFeatures ? (
-                      <div className="track-features">
-                        <span>{currentFeatures.bpm} BPM</span>
-                        <span>NRG {currentFeatures.energy}</span>
-                        <span>MOD {currentFeatures.mood}</span>
-                      </div>
-                    ) : (
-                      <div className="track-features track-features--empty">NO DATA</div>
-                    )}
-                  </div>
-                  <div className="track-divider" />
-                  <div className="track-next">
-                    <span className="track-label">NEXT</span>
-                    {nextTrack ? (
-                      <>
-                        <div className="track-name-scroll track-name-scroll--dim">
-                          <span>{nextTrack.name}</span>
-                        </div>
-                        <div className="track-artist track-artist--dim">{nextTrack.artistName}</div>
-                      </>
-                    ) : (
-                      <div className="track-artist">—</div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="track-idle">INSERT TAPE</div>
-              )}
-            </div>
-          </div>
-
-          <div className="speaker-grille">
-            {Array.from({ length: 8 }, (_, row) => (
-              <div key={row} className="speaker-row">
-                {Array.from({ length: 10 }, (_, col) => (
-                  <div key={col} className="speaker-dot" />
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
+        <div className="np-logo-stripe np-logo-stripe--teal" />
       </div>
 
-      {/* Controls */}
-      <div className="player-controls">
+      {/* ── LEFT PANEL: dB Meter + Volume ───────────────── */}
+      {/* dB meter */}
+      <span className="np-label np-db-label">dB</span>
+      <div className="np-db-frame">
+        <img src={A.imgLine1} alt="" className="np-db-axis" />
+        {/* Tick marks and labels at fixed y offsets within the frame */}
+        {DB_TICKS.map(({ label, y }) => (
+          <span key={label} className="np-db-num" style={{ top: `${y}px` }}>{label}</span>
+        ))}
+        {DB_TICKS.map(({ label, y }) => (
+          <img key={`t-${label}`} src={A.imgLine2} alt="" className="np-db-tick" style={{ top: `${y}px` }} />
+        ))}
+        {/* Animated gauge needle */}
+        <div className="np-db-gauge" style={{ top: `${gaugeY}px` }} />
+        {/* Glass overlay */}
+        <div className="np-db-glass" />
+      </div>
+
+      {/* Volume slider */}
+      <span className="np-label np-vol-label">VOL</span>
+      <div className="np-vol-track">
+        <img src={A.imgVolTrackBg} alt="" className="np-vol-track-bg" />
+        <div className="np-vol-track-groove" />
+        <img src={A.imgVolumeTicks} alt="" className="np-vol-ticks-img" />
+      </div>
+      {/* Full-track invisible range input */}
+      <input
+        type="range" min={0} max={1} step={0.01} value={volume}
+        className="np-vol-input"
+        onChange={(e) => setVolume(Number(e.target.value))}
+      />
+      {/* Knob image follows value */}
+      <div className="np-vol-knob-wrap" style={{ top: `${volKnobY}px` }}>
+        <img src={A.imgVolumeSliderNob} alt="" className="np-vol-knob-img" />
+      </div>
+
+      {/* ── CENTER: Tape Bay ─────────────────────────────── */}
+      <div className="np-tape-bay">
+        <div className="np-tape-bay-inner" style={{
+          background: 'linear-gradient(150.65deg, rgb(49,40,40) 20%, rgb(9,5,5) 75%)',
+          boxShadow: 'inset 0px 8px 1px 0px black',
+        }} />
+
+        {isInserted && currentCassette ? (
+          <>
+            <img src={A.imgBackTape} alt="" className="np-back-tape" />
+            {/* Left reel */}
+            <motion.div
+              className="np-reel np-reel--left"
+              animate={{ rotate: isPlaying ? leftDeg : 0 }}
+              transition={{ duration: 0.5, ease: 'linear' }}
+            >
+              <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
+              <img src={A.imgReelHub} alt="" className="np-reel-hub" />
+              <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
+              <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
+              <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
+              <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+            </motion.div>
+            {/* Right reel */}
+            <motion.div
+              className="np-reel np-reel--right"
+              animate={{ rotate: isPlaying ? rightDeg : 0 }}
+              transition={{ duration: 0.5, ease: 'linear' }}
+            >
+              <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
+              <img src={A.imgReelHub} alt="" className="np-reel-hub" />
+              <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
+              <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
+              <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
+              <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+            </motion.div>
+          </>
+        ) : (
+          <div className="np-tape-empty">INSERT TAPE</div>
+        )}
+      </div>
+
+      {/* ── Screen ───────────────────────────────────────── */}
+      <div className="np-screen">
+        {/* Content */}
+        <div className="np-screen-inner">
+          {/* NEXT column */}
+          <div className="np-screen-col np-screen-col--next">
+            <div className="np-screen-header">
+              <span className="np-screen-label">NEXT</span>
+            </div>
+            {nextTrack ? (
+              <>
+                <div className="np-screen-progress-track np-screen-progress-track--empty" />
+                <div className="np-screen-title np-screen-title--dim">{nextTrack.name}</div>
+                <div className="np-screen-artist np-screen-artist--dim">{nextTrack.artistName}</div>
+              </>
+            ) : (
+              <div className="np-screen-artist np-screen-artist--dim">—</div>
+            )}
+            {(() => {
+              const nextFeatures = nextTrack ? featuresMap.get(nextTrack.id) : undefined
+              return nextFeatures ? (
+                <div className="np-screen-meta np-screen-meta--dim">
+                  <span>{nextFeatures.bpm} BPM</span>
+                  <img src={A.imgLine14} alt="" className="np-meta-sep" />
+                  <span>NRG {nextFeatures.energy}</span>
+                  <img src={A.imgLine14} alt="" className="np-meta-sep" />
+                  <span>MOOD {nextFeatures.mood}</span>
+                </div>
+              ) : (
+                <div className="np-screen-meta np-screen-meta--placeholder" />
+              )
+            })()}
+          </div>
+
+          <div className="np-screen-divider" />
+
+          {/* NOW column */}
+          <div className="np-screen-col np-screen-col--now">
+            <div className="np-screen-header">
+              <span className="np-screen-label">NOW</span>
+              {currentTrack && (
+                <span className="np-screen-time">{formatTime(currentTime)} / {formatTime(duration)}</span>
+              )}
+            </div>
+            {currentTrack ? (
+              <>
+                <div className="np-screen-progress-track">
+                  <div className="np-screen-progress-fill" style={{ width: `${progress * 100}%` }} />
+                </div>
+                <div className="np-screen-title">{currentTrack.name}</div>
+                <div className="np-screen-artist">{currentTrack.artistName}</div>
+              </>
+            ) : (
+              <div className="np-screen-idle">INSERT TAPE</div>
+            )}
+            {currentFeatures ? (
+              <div className="np-screen-meta">
+                <span>{currentFeatures.bpm} BPM</span>
+                <img src={A.imgLine14} alt="" className="np-meta-sep" />
+                <span>NRG {currentFeatures.energy}</span>
+                <img src={A.imgLine14} alt="" className="np-meta-sep" />
+                <span>MOOD {currentFeatures.mood}</span>
+              </div>
+            ) : (
+              <div className="np-screen-meta np-screen-meta--empty">NO DATA</div>
+            )}
+          </div>
+        </div>
+        {/* Glass reflection */}
+        <div className="np-screen-glass" />
+      </div>
+
+      {/* ── Button Guard Text Labels ─────────────────────── */}
+      <div className="np-btn-labels">
+        <span style={{ left: '222px' }}>REWIND</span>
+        <span style={{ left: '295px' }}>STOP</span>
+        <span style={{ left: '356px' }}>PAUSE</span>
+        <span style={{ left: '425px' }}>PLAY</span>
+        <span style={{ left: '494px' }}>F.F</span>
+        <span style={{ left: '559px' }}>EJECT</span>
+      </div>
+
+      {/* Button guard overlay */}
+      <img src={A.imgButtonGuard} alt="" className="np-btn-guard" />
+
+      {/* ── Buttons ──────────────────────────────────────── */}
+      {/* Order: REWIND | STOP | PAUSE | PLAY | F.F | EJECT            */}
+      {/* Figma names are swapped: imgNextButton=REWIND, imgPrevButton=FF */}
+      <div className="np-buttons">
+        {/* REWIND (hold) */}
         <button
-          className="ctrl-btn ctrl-btn--eject"
-          onClick={handleEject}
-          disabled={!isInserted}
-          title="Eject"
-        >
-          &#9650;
-        </button>
-        <button
-          className="ctrl-btn"
+          className="np-btn"
           disabled={!isInserted || !isPlaying}
-          title="Fast backward (hold)"
-          onMouseDown={startFB}
-          onMouseUp={stopFB}
-          onMouseLeave={stopFB}
-          onTouchStart={startFB}
-          onTouchEnd={stopFB}
+          onMouseDown={(e) => { setPressedBtn('rewind'); startFB(e) }}
+          onMouseUp={(e) => { setPressedBtn(null); stopFB(e) }}
+          onMouseLeave={(e) => { setPressedBtn(null); stopFB(e) }}
+          onTouchStart={(e) => { setPressedBtn('rewind'); startFB(e) }}
+          onTouchEnd={(e) => { setPressedBtn(null); stopFB(e) }}
         >
-          &#9664;&#9664;
+          <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'rewind' ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgNextButton} alt="Rewind" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
         </button>
-        <button
-          className="ctrl-btn ctrl-btn--play"
-          onClick={handlePlay}
-          disabled={!isInserted || isPlaying}
-          title="Play"
-        >
-          &#9654;
+        {/* STOP */}
+        <button className="np-btn" onClick={handleStop} disabled={!isInserted || playbackState === 'stopped'}
+          onMouseDown={() => setPressedBtn('stop')} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
+          <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'stop' ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgStopButton} alt="Stop" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
         </button>
+        {/* PAUSE */}
+        <button className="np-btn" onClick={handlePause} disabled={!isInserted || (playbackState !== 'playing' && playbackState !== 'paused')}
+          onMouseDown={() => setPressedBtn('pause')} onMouseUp={() => { if (playbackState === 'paused') setPressedBtn(null) }} onMouseLeave={() => setPressedBtn(null)}>
+          <div className={`np-btn-slot np-btn-slot--sm${(pressedBtn === 'pause' || playbackState === 'paused') ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgPauseButton} alt="Pause" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
+        </button>
+        {/* PLAY */}
+        <button className="np-btn" onClick={handlePlay} disabled={!isInserted}
+          onMouseDown={() => setPressedBtn('play')} onMouseUp={() => { if (playbackState === 'playing') setPressedBtn(null) }} onMouseLeave={() => setPressedBtn(null)}>
+          <div className={`np-btn-slot np-btn-slot--sm${(pressedBtn === 'play' || playbackState === 'playing' || playbackState === 'paused') ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgPlayButton} alt="Play" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
+        </button>
+        {/* F.F (hold) */}
         <button
-          className="ctrl-btn"
-          onClick={handlePause}
+          className="np-btn"
           disabled={!isInserted || !isPlaying}
-          title="Pause"
+          onMouseDown={(e) => { setPressedBtn('ff'); startFF(e) }}
+          onMouseUp={(e) => { setPressedBtn(null); stopFF(e) }}
+          onMouseLeave={(e) => { setPressedBtn(null); stopFF(e) }}
+          onTouchStart={(e) => { setPressedBtn('ff'); startFF(e) }}
+          onTouchEnd={(e) => { setPressedBtn(null); stopFF(e) }}
         >
-          &#9646;&#9646;
+          <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'ff' ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgPrevButton} alt="Fast Forward" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
         </button>
-        <button
-          className="ctrl-btn ctrl-btn--stop"
-          onClick={handleStop}
-          disabled={!isInserted || playbackState === 'stopped'}
-          title="Stop"
-        >
-          &#9632;
+        {/* EJECT */}
+        <button className="np-btn" onClick={handleEject} disabled={!isInserted}
+          onMouseDown={() => setPressedBtn('eject')} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
+          <div className={`np-btn-slot np-btn-slot--lg${pressedBtn === 'eject' ? ' np-btn-slot--pressed' : ''}`}>
+            <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
+            <div className="np-btn-inner">
+              <img src={A.imgEjectButton} alt="Eject" className="np-btn-img" />
+              <div className="np-btn-gradient"><img src={A.imgButtonGradiant} alt="" /></div>
+            </div>
+          </div>
         </button>
-        <button
-          className="ctrl-btn"
-          disabled={!isInserted || !isPlaying}
-          title="Fast forward (hold)"
-          onMouseDown={startFF}
-          onMouseUp={stopFF}
-          onMouseLeave={stopFF}
-          onTouchStart={startFF}
-          onTouchEnd={stopFF}
-        >
-          &#9654;&#9654;
-        </button>
-        <button
-          className="ctrl-btn"
-          disabled={!isInserted || !nextTrack}
-          title="Next track"
-          onClick={() => {
-            playQueueFrom(displayQueue, currentTrackIndex + 1).catch(() => {})
-          }}
-        >
-          &#9654;&#124;
-        </button>
+      </div>
+
+      {/* ── RIGHT PANEL: Speaker + Tape Type ─────────────── */}
+      <img src={A.imgSpeaker} alt="" className="np-speaker" />
+
+      {/* Tape type selector */}
+      <span className="np-label np-tapetype-label">TAPE TYPE</span>
+      <div className="np-tapetype-frame">
+        <img src={A.imgTapeTypeBg} alt="" className="np-tapetype-bg" />
+        <div className="np-tapetype-inner" style={{
+          background: 'linear-gradient(161deg, rgb(49,40,40) 20%, rgb(9,5,5) 75%)',
+          boxShadow: 'inset 0px 8px 1px 0px black',
+        }} />
+      </div>
+      <div className="np-tapetype-options">
+        {qualityLabels.map((q) => (
+          <button key={q} className={`np-tapetype-opt ${quality === q ? 'np-tapetype-opt--active' : ''}`} onClick={() => setQuality(q)}>
+            {q.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <div
+        className="np-tapetype-knob-wrap"
+        style={{ left: `${tapeKnobX}px`, cursor: 'grab' }}
+        onMouseDown={onKnobMouseDown}
+      >
+        <img src={A.imgTapeTypeNobSelector} alt="" className="np-tapetype-knob-img" />
       </div>
     </div>
   )
