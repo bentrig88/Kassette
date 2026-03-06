@@ -109,15 +109,82 @@ The shuffled slice is stored in `playerStore.queuedTracks` so the LCD display ma
 ---
 
 ## Genres
-Six cassettes, matched by keyword against `track.genreNames`:
-| Genre | Keywords |
-|---|---|
-| Rock | rock, metal, punk, grunge, alternative |
-| Hip-Hop | hip-hop, rap, trap, r&b |
-| Electronic | electronic, techno, house, edm, dance |
-| Reggae | reggae, dancehall, ska, dub |
-| Classical | classical, orchestra, symphony, opera |
-| Folk | folk, country, bluegrass, acoustic |
+Eight cassettes (added Jazz and Pop in Phase 2), matched by keyword against `track.genreNames`:
+| Genre | Color | Keywords (sample) |
+|---|---|---|
+| Rock | #c0392b | rock, metal, punk, grunge, alternative, indie rock |
+| Hip-Hop | #8e44ad | hip-hop, rap, trap, r&b, soul |
+| Electronic | #2980b9 | electronic, techno, house, edm, dance, ambient |
+| Reggae | #27ae60 | reggae, dancehall, ska, dub, afrobeat |
+| Classical | #d4a017 | classical, orchestra, symphony, piano, soundtrack |
+| Folk | #e67e22 | folk, country, bluegrass, acoustic, singer-songwriter |
+| Jazz | #1a6b8a | jazz, fusion, bebop, swing, bossa nova |
+| Pop | #e91e8c | pop, french pop, synth-pop, indie pop |
+
+---
+
+## Phase 2 — Audio Analysis & Smart Sliders
+
+### Overview
+Three sliders (Pace/Tempo, Energy, Mood) dynamically re-sort the upcoming queue based on per-track audio features (BPM, energy, mood/valence).
+
+### Audio Feature Extraction
+Apple Music API does **not** expose audio features to developers (400 error on the audio-features endpoint). Instead, features are extracted from **30-second preview clips** attached to each catalog song:
+1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs and extracts `attributes.previews[0].url`
+2. `analyzeBuffer(id, buffer)` — runs on a decoded `AudioBuffer` (via `AudioContext.decodeAudioData`):
+   - **Energy**: RMS of the full signal, normalized 0–100
+   - **Mood**: zero-crossing rate as a brightness proxy, normalized 0–100
+   - **BPM**: autocorrelation of onset-strength envelope (standard musicology approach), folded into 60–150 range
+3. Results cached in IndexedDB (`kassette-features`, v3) via `featureCache.ts`
+4. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
+
+### Analysis Priority & Background Processing
+- **Active cassette**: `usePreviewAnalysis(displayQueue)` analyzes the 100-track queue one track at a time (100ms between tracks). Runs immediately on cassette insert.
+- **All other tracks**: `useBackgroundAnalysis(allTracks)` starts after a 10s delay, processes every library track at 1s/track, skipping already-cached entries. Ensures subsequent cassette inserts have data ready.
+
+### Sorting Logic
+`sortTracksByFilters(tracks, featuresMap, tempo, energy, mood)` in `appleMusic.ts`:
+- Each slider (0–100) is a **directional weight**, not a target: slider 0 = want lowest, slider 100 = want highest, slider 50 = neutral (no effect)
+- Only the **upcoming tracks** (after currentTrackIndex) are re-sorted — the current track is never affected
+- Unanalyzed tracks go to the end, preserving their shuffled order
+- The sort runs when any slider is changed; `currentTrackIndex` is NOT updated (stays pointing at current track)
+
+### Queue Management
+`playQueueFrom(tracks, startIndex)` in `appleMusic.ts`:
+- Loads a 20-track window from the sorted queue into MusicKit's internal queue, then stop() + play()
+- Used by the **Next** button and the `completed` auto-advance handler
+- Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order
+
+### Slider Auto-Snap
+When a new track starts, the three sliders automatically move to reflect that track's BPM/energy/mood position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag).
+
+### Sliders Disabled State
+If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (`pointer-events: none`) with the message "Analyzing your tape… N/20 tracks ready". They unlock automatically as analysis progresses.
+
+### Track Display
+The CassettePlayer LCD screen shows `BPM / NRG / MOD` metadata for the current track if analysis data is available, or `NO DATA` otherwise. Useful for verifying analysis accuracy.
+
+### Known Limitations / Future Work
+- BPM accuracy is reasonable for most genres but imperfect (30s preview, onset detection)
+- Energy and Mood (ZCR-based) are rough proxies — could be improved with FFT-based spectral features
+- Sliders reset to track values on track change, which can conflict with user-set filters if user wants persistent filtering across tracks
+- Phase 3 will redesign the full UI
+
+---
+
+## Key Technical Decisions & Findings (Phase 2 additions)
+
+### MusicKit play() after setQueue
+After calling `setQueue`, MusicKit's PlayActivity is uninitialized. Calling `play()` directly throws *"play() was called without a previous stop() or pause() call"*. Fix: call `music.stop()` first when not in paused state — this synchronously initializes PlayActivity.
+
+### Apple Music Audio Features API
+`GET /v1/catalog/{storefront}/songs/{id}/audio-features` returns 400 "No relationship found matching 'audio-features'". The `include=audio-features` parameter on the songs endpoint is also silently ignored. Audio features are NOT available to standard Apple developer accounts.
+
+### Preview Audio CORS
+Apple's preview URLs (`audio-ssl.itunes.apple.com`) support CORS browser fetch. Decoding with `AudioContext.decodeAudioData()` works. ~30s AAC clips, ~1-2MB each.
+
+### MusicKit nowPlayingItemDidChange — track index sync
+`music.queue.position` reflects MusicKit's internal queue order, which diverges from `queuedTracks` after a re-sort. Fix: look up `music.nowPlayingItem?.id` in `queuedTracks` by ID to get the correct index. See `onNowPlayingChange` in `CassettePlayer.tsx`.
 
 ---
 
@@ -131,5 +198,5 @@ npm run build    # production build
 
 ## Phases
 - **Phase 1** ✅ — Auth, genre cassettes, player controls, queue, VU meter, tape filter, SFX
-- **Phase 2** — Essentia.js in-browser audio analysis → tempo/energy/mood sliders functional
+- **Phase 2** ✅ — Preview-based audio analysis, BPM/energy/mood sliders, background analysis, smart queue sorting
 - **Phase 3** — Full visual redesign: proper cassette artwork, insert animation, retro aesthetics

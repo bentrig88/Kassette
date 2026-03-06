@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import type { Cassette, PlaybackState, AudioQuality, Track } from '../types/music'
+import type { TrackFeatures } from '../services/featureCache'
 
 interface PlayerState {
   currentCassette: Cassette | null
-  queuedTracks: Track[]  // shuffled queue actually loaded into MusicKit
+  queuedTracks: Track[]
   isInserted: boolean
   playbackState: PlaybackState
   volume: number
@@ -12,10 +13,14 @@ interface PlayerState {
   currentTime: number
   duration: number
 
-  // Playlist controller values (Phase 2 will use these for Essentia.js filtering)
-  tempoFilter: number  // 0-100 (slow to fast)
-  energyFilter: number // 0-100 (low to high)
-  moodFilter: number   // 0-100 (sad to happy)
+  tempoFilter: number   // 0–100 (slow → fast BPM)
+  energyFilter: number  // 0–100 (low → high energy)
+  moodFilter: number    // 0–100 (sad → happy)
+  filtersActive: boolean // true when any slider is off-center
+
+  // Audio features keyed by track ID — grows as tracks are analyzed
+  featuresMap: Map<string, TrackFeatures>
+  analyzedCount: number
 
   insertCassette: (cassette: Cassette) => void
   setQueuedTracks: (tracks: Track[]) => void
@@ -29,6 +34,12 @@ interface PlayerState {
   setTempoFilter: (value: number) => void
   setEnergyFilter: (value: number) => void
   setMoodFilter: (value: number) => void
+  addFeatures: (features: TrackFeatures) => void
+  bulkAddFeatures: (features: TrackFeatures[]) => void
+}
+
+function isActive(tempo: number, energy: number, mood: number) {
+  return tempo !== 50 || energy !== 50 || mood !== 50
 }
 
 export const usePlayerStore = create<PlayerState>((set) => ({
@@ -45,6 +56,10 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   tempoFilter: 50,
   energyFilter: 50,
   moodFilter: 50,
+  filtersActive: false,
+
+  featuresMap: new Map(),
+  analyzedCount: 0,
 
   insertCassette: (cassette) =>
     set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [] }),
@@ -60,7 +75,22 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setCurrentTrackIndex: (index) => set({ currentTrackIndex: index }),
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
-  setTempoFilter: (value) => set({ tempoFilter: value }),
-  setEnergyFilter: (value) => set({ energyFilter: value }),
-  setMoodFilter: (value) => set({ moodFilter: value }),
+
+  setTempoFilter: (value) => set((s) => ({ tempoFilter: value, filtersActive: isActive(value, s.energyFilter, s.moodFilter) })),
+  setEnergyFilter: (value) => set((s) => ({ energyFilter: value, filtersActive: isActive(s.tempoFilter, value, s.moodFilter) })),
+  setMoodFilter: (value) => set((s) => ({ moodFilter: value, filtersActive: isActive(s.tempoFilter, s.energyFilter, value) })),
+
+  addFeatures: (features) =>
+    set((s) => {
+      const next = new Map(s.featuresMap)
+      next.set(features.id, features)
+      return { featuresMap: next, analyzedCount: next.size }
+    }),
+
+  bulkAddFeatures: (features) =>
+    set((s) => {
+      const next = new Map(s.featuresMap)
+      for (const f of features) next.set(f.id, f)
+      return { featuresMap: next, analyzedCount: next.size }
+    }),
 }))

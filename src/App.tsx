@@ -8,6 +8,8 @@ import {
   buildCassettes,
   getMusicKitInstance,
 } from './services/appleMusic'
+import { getAllFeatures } from './services/featureCache'
+import { useBackgroundAnalysis } from './hooks/useBackgroundAnalysis'
 import { AuthScreen } from './components/AuthScreen'
 import { CassetteCarousel } from './components/CassetteCarousel'
 import { CassettePlayer } from './components/CassettePlayer'
@@ -23,10 +25,15 @@ export default function App() {
   const setLoading = useMusicStore((s) => s.setLoading)
   const setLoadingProgress = useMusicStore((s) => s.setLoadingProgress)
   const setCassettes = useMusicStore((s) => s.setCassettes)
+  const setAllTracks = useMusicStore((s) => s.setAllTracks)
+  const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
   const isInserted = usePlayerStore((s) => s.isInserted)
 
-  // On mount: try to restore existing MusicKit session
+  useBackgroundAnalysis(allTracks)
+  const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
+
+  // On mount: try to restore existing MusicKit session + load cached audio features
   useEffect(() => {
     async function tryRestore() {
       try {
@@ -39,7 +46,14 @@ export default function App() {
       }
     }
     tryRestore()
-  }, [setAuthenticated])
+
+    getAllFeatures().then((cached) => {
+      if (cached.size > 0) {
+        bulkAddFeatures([...cached.values()])
+        console.log(`[Kassette] Loaded ${cached.size} cached track features from IndexedDB`)
+      }
+    }).catch(() => {/* IndexedDB not available */})
+  }, [setAuthenticated, bulkAddFeatures])
 
   // When authenticated, load library
   useEffect(() => {
@@ -52,10 +66,11 @@ export default function App() {
 
       try {
         const tracks = await fetchLibraryTracks((loaded, est) => {
-          setLoadingProgress(Math.min(90, (loaded / est) * 100))
+          setLoadingProgress(Math.min(95, (loaded / est) * 95))
         })
         const cassettes = buildCassettes(tracks)
         setCassettes(cassettes)
+        setAllTracks(tracks)
         setLoadingProgress(100)
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load library'
@@ -80,7 +95,7 @@ export default function App() {
           <div className="loading-bar-container">
             <div className="loading-bar" style={{ width: `${loadingProgress}%` }} />
           </div>
-          <div className="loading-hint">Building your cassettes</div>
+          <div className="loading-hint">Building your cassettes…</div>
         </div>
       </div>
     )

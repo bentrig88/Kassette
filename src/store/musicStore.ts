@@ -6,6 +6,7 @@ interface MusicState {
   isLoading: boolean
   loadingProgress: number // 0-100
   cassettes: Cassette[]
+  allTracks: Track[]
   selectedCassetteIndex: number
   error: string | null
 
@@ -13,6 +14,7 @@ interface MusicState {
   setLoading: (value: boolean) => void
   setLoadingProgress: (value: number) => void
   setCassettes: (cassettes: Cassette[]) => void
+  setAllTracks: (tracks: Track[]) => void
   setSelectedIndex: (index: number) => void
   setError: (error: string | null) => void
 }
@@ -22,6 +24,7 @@ export const useMusicStore = create<MusicState>((set) => ({
   isLoading: false,
   loadingProgress: 0,
   cassettes: [],
+  allTracks: [],
   selectedCassetteIndex: 0,
   error: null,
 
@@ -29,6 +32,7 @@ export const useMusicStore = create<MusicState>((set) => ({
   setLoading: (value) => set({ isLoading: value }),
   setLoadingProgress: (value) => set({ loadingProgress: value }),
   setCassettes: (cassettes) => set({ cassettes }),
+  setAllTracks: (tracks) => set({ allTracks: tracks }),
   setSelectedIndex: (index) => set({ selectedCassetteIndex: index }),
   setError: (error) => set({ error }),
 }))

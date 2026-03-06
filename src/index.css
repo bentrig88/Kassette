@@ -644,6 +644,20 @@ input[type='range'] {
 
 .track-artist--dim { opacity: 0.4; }
 
+.track-features {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  font-size: 0.55rem;
+  color: var(--lcd-text);
+  opacity: 0.7;
+  letter-spacing: 0.03em;
+}
+
+.track-features--empty {
+  opacity: 0.3;
+}
+
 .track-divider {
   height: 1px;
   background: var(--lcd-text);
@@ -746,6 +760,11 @@ input[type='range'] {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 2rem;
+}
+
+.playlist-sliders--disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .playlist-slider-group {
