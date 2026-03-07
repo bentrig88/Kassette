@@ -6,6 +6,7 @@ import { usePlayerStore } from '../store/playerStore'
 import { loadCassetteQueue } from '../services/appleMusic'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import type { Cassette } from '../types/music'
+import { CassetteTapeBody } from './CassetteTapeBody'
 
 const BASE_CASSETTE_GAP = 100
 const BASE_CASSETTE_HEIGHT = 140
@@ -13,7 +14,7 @@ const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 }
 
 function getCassetteDims() {
   const height = window.innerHeight * 0.22
-  const width = Math.round(height * 15 / 10)
+  const width = Math.round(height * 550 / 342) // matches cassette-body--new aspect-ratio
   const gap = Math.round(height * BASE_CASSETTE_GAP / BASE_CASSETTE_HEIGHT)
   return { width, gap, itemWidth: width + gap }
 }
@@ -26,6 +27,17 @@ export function CassetteCarousel() {
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const insertCassette = usePlayerStore((s) => s.insertCassette)
   const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
+  const setInsertSourceRect = usePlayerStore((s) => s.setInsertSourceRect)
+
+  const [isInserting, setIsInserting] = useState(false)
+  // y offset (px) that moves the selected cassette to 110px from viewport top.
+  // Computed from cassette-item's natural layout position before animation starts.
+  const liftYRef = useRef(0)
+
+  // Reset isInserting when the cassette is ejected so the carousel reopens cleanly
+  useEffect(() => {
+    if (!isInserted) setIsInserting(false)
+  }, [isInserted])
 
   const N = cassettes.length
 
@@ -117,8 +129,31 @@ export function CassetteCarousel() {
   useKeyboardNav(goLeft, goRight, !isInserted)
 
   async function handleInsert(cassette: Cassette) {
+    // Measure cassette-item's static layout position to compute the lift offset.
+    // We use the cassette-item wrapper (no transforms applied) so liftY is accurate.
+    const el = document.querySelector('[data-insert-target]') as HTMLElement | null
+    if (el) {
+      const rect = el.getBoundingClientRect()
+      liftYRef.current = 110 - rect.top
+    }
+    setIsInserting(true)
+    // Start loading queue in parallel with the carousel lift animation
+    const queuePromise = loadCassetteQueue(cassette, 0)
+    // Wait for the lift animation (400ms) to finish, plus queue loading
+    const [shuffled] = await Promise.all([
+      queuePromise,
+      new Promise<void>(resolve => setTimeout(resolve, 500)),
+    ])
+    // Measure the motion.div's ACTUAL rendered position after the lift animation.
+    // data-flip-source is on the motion.div so getBoundingClientRect() includes
+    // the translateY from the lift — this is the FLIP source position.
+    const flipEl = document.querySelector('[data-flip-source]') as HTMLElement | null
+    if (flipEl) {
+      const rect = flipEl.getBoundingClientRect()
+      setInsertSourceRect({ top: rect.top, left: rect.left, width: rect.width, height: rect.height })
+    }
+    // React 18 batches these into one render
     insertCassette(cassette)
-    const shuffled = await loadCassetteQueue(cassette, 0)
     setQueuedTracks(shuffled)
   }
 
@@ -133,10 +168,23 @@ export function CassetteCarousel() {
   return (
     <>
       <AnimatePresence>
-        {!isInserted && (
+        {!isInserted && !isInserting && (
           <motion.div
             key="blur-overlay"
             className="carousel-blur-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!isInserted && !isInserting && (
+          <motion.div
+            key="white-overlay"
+            className="carousel-white-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -152,7 +200,7 @@ export function CassetteCarousel() {
             className="carousel-wrapper"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0 } }}
             transition={{ duration: 0.3 }}
           >
             <div
@@ -191,22 +239,30 @@ export function CassetteCarousel() {
                       isInserted={isMiddle && isInserted && currentCassette?.id === cassette.id}
                       isMiddle={isMiddle}
                       width={dims.width}
+                      isInserting={isInserting}
+                      selectedCassetteId={selectedCassette?.id}
+                      liftY={liftYRef.current}
+                      isInsertTarget={isMiddle && i === virtualIndex}
                     />
                   )
                 })}
               </motion.div>
             </div>
 
-            <div className="carousel-nav">
+            <motion.div
+              className="carousel-nav"
+              animate={{ opacity: isInserting ? 0 : 1 }}
+              transition={{ duration: 0.3 }}
+            >
               <button className="nav-arrow" onClick={goLeft}>&#8592;</button>
               <button className="nav-arrow" onClick={goRight}>&#8594;</button>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {selectedCassette && !selectedIsInserted && (
+        {selectedCassette && !selectedIsInserted && !isInserting && (
           <motion.button
             key="insert-btn"
             className="insert-button insert-button--floating"
@@ -224,39 +280,82 @@ export function CassetteCarousel() {
   )
 }
 
+// Seeded pseudo-random helpers for stable per-cassette levitation values
+function stableHash(id: string) {
+  return id.split('').reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 0)
+}
+function pick(seed: number, max: number) {
+  return (seed % (max * 2 + 1)) - max
+}
+
 interface CassetteItemProps {
   cassette: Cassette
   isSelected: boolean
   isInserted: boolean
   isMiddle: boolean
   width: number
+  isInserting: boolean
+  selectedCassetteId: string | undefined
+  liftY: number
+  isInsertTarget: boolean
 }
 
-function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width }: CassetteItemProps) {
+function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width, isInserting, selectedCassetteId, liftY, isInsertTarget }: CassetteItemProps) {
+  const h = stableHash(cassette.id)
+
+  // Independent per-cassette keyframe targets for x, y, rotate
+  const x1 = pick(h * 7,        15), x2 = pick(h * 11 + 5,  15)
+  const y1 = pick(h * 13,       15), y2 = pick(h * 17 + 3,  15)
+  const r1 = pick(h * 3,         5), r2 = pick(h * 19 + 7,   5)
+  // Staggered durations so axes drift out of phase (3–5 s each)
+  const durX = 3 + (h % 3)
+  const durY = 3 + ((h >> 4) % 3)
+  const durR = 4 + ((h >> 8) % 3)
+
+  // This tape should fade+shrink if inserting a different cassette
+  const isExiting = isInserting && cassette.id !== selectedCassetteId
+
   return (
-    <div className="cassette-item" style={{ width }}>
+    // data-insert-target marks this element for DOM measurement in handleInsert
+    <div className="cassette-item" style={{ width }} {...(isInsertTarget ? { 'data-insert-target': '' } : {})}>
       <AnimatePresence>
         {!isInserted && (
           <motion.div
-            layoutId={isMiddle ? `cassette-${cassette.id}` : undefined}
+            key={cassette.id}
+            {...(isInsertTarget ? { 'data-flip-source': '' } : {})}
             animate={{
-              y: isSelected ? -12 : 0,
-              scale: isSelected ? 1.05 : 0.95,
+              y: isInserting && isSelected
+                ? liftY
+                : (isSelected ? -12 : 0),
+              scale: isExiting ? 0.7 : (isSelected ? 1.05 : 0.95),
+              opacity: isExiting ? 0 : 1,
             }}
-            transition={SPRING}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            transition={isExiting || (isInserting && isSelected)
+              ? { duration: 0.4, ease: 'easeInOut' }
+              : SPRING
+            }
           >
-            <div className="cassette-body" style={{ borderColor: cassette.color }}>
-              <div className="cassette-label" style={{ backgroundColor: cassette.color }}>
-                <span className="cassette-genre">{cassette.genre}</span>
-                <span className="cassette-count">{cassette.tracks.length} tracks</span>
+            {/* Levitation layer — independent slow drift per cassette */}
+            <motion.div
+              animate={isInserting
+                ? { x: 0, y: 0, rotate: 0 }
+                : { x: [x1, x2], y: [y1, y2], rotate: [r1, r2] }
+              }
+              transition={isInserting
+                ? { duration: 0.4, ease: 'easeInOut' }
+                : {
+                    x:      { duration: durX, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' },
+                    y:      { duration: durY, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' },
+                    rotate: { duration: durR, ease: 'easeInOut', repeat: Infinity, repeatType: 'reverse' },
+                  }
+              }
+              style={{ filter: 'drop-shadow(0 45px 60px rgba(0,0,0,0.55))' }}
+            >
+              <div className="cassette-body cassette-body--new">
+                <CassetteTapeBody cassette={cassette} />
               </div>
-              <div className="cassette-reels">
-                <div className="cassette-reel" />
-                <div className="cassette-tape-window" />
-                <div className="cassette-reel" />
-              </div>
-              <div className="cassette-bottom-strip" />
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

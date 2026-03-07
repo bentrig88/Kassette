@@ -2,7 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #1a1a1a;
+  --bg: #6a6a6a;
   --surface: #252525;
   --surface-2: #2e2e2e;
   --border: #3a3a3a;
@@ -151,6 +151,57 @@ input[type='range'] {
   font-size: 0.8rem;
 }
 
+/* ─── Scene Background ─────────────────────────────────────── */
+/* Fixed full-screen layer rendered behind all app content.
+   Objects use --player-scale so they resize with the player. */
+.scene-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.scene-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.scene-obj {
+  position: absolute;
+  bottom: 0;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Object 1 — left of player (880×1204) */
+.scene-obj-1 {
+  left: calc(60% + var(--player-scale, 1) * 380px);
+  height: calc(var(--player-scale, 1) * 520px);
+  bottom: auto;
+  top: -15%;
+  rotate: -10deg;
+}
+
+/* Object 2 — right of player (689×989) */
+.scene-obj-2 {
+  left: calc(60% + var(--player-scale, 1) * 410px);
+  height: calc(var(--player-scale, 1) * 559px);
+  bottom: auto;
+  top: 57%;
+  rotate: 15deg;
+}
+
+/* Object 3 — further right (482×1048) */
+.scene-obj-3 {
+  right: calc(50% + var(--player-scale, 1) * 620px);
+  height: calc(var(--player-scale, 1) * 720px);
+  bottom: auto;
+  top: 17%;
+  rotate: 27deg;
+}
+
 /* ─── App Layout ───────────────────────────────────────────── */
 .app {
   display: flex;
@@ -170,7 +221,8 @@ input[type='range'] {
   padding: 0.75rem 2rem;
   border-bottom: 1px solid var(--border);
   z-index: 25;
-  background: var(--bg);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
 }
 
 .app-logo {
@@ -211,6 +263,15 @@ input[type='range'] {
   -webkit-backdrop-filter: blur(10px);
   background: rgba(0, 0, 0, 0.35);
   z-index: 20;
+  pointer-events: none;
+}
+
+/* ─── White overlay — above player, below blur layer ────────── */
+.carousel-white-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.4);
+  z-index: 15;
   pointer-events: none;
 }
 
@@ -261,6 +322,147 @@ input[type='range'] {
   align-items: center;
   overflow: hidden;
   position: relative;
+}
+
+/* New TDK-style cassette design — overrides old placeholder styling */
+.cassette-body--new {
+  display: block;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  /* Aspect ratio matches the cassette body bounding box (550×342 in Figma) */
+  aspect-ratio: 550 / 342;
+  /* --cw = cassette width, used by ct-* children for background-position/size calc */
+  --cw: calc(var(--ch) * 550 / 342);
+}
+
+/* ─── Cassette Tape Body (TDK-style, 4-part structure) ───────
+   Part 1: ct-reel-left  — single <img>
+   Part 2: ct-reel-right — single <img>
+   Part 3: ct-swapable   — single <div> with CSS background-image stacking (all body layers)
+   Part 4: ct-window     — pure CSS, no image
+   + ct-sticker          — HTML/CSS with dynamic genre color & text
+   ─────────────────────────────────────────────────────────── */
+
+.ct-body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  isolation: isolate; /* creates stacking context so child z-indices are self-contained */
+}
+
+/* Explicit stacking order within ct-body — prevents implicit DOM-order stacking
+   from breaking when a CSS transition/transform is active on a parent element. */
+.ct-reel-left,
+.ct-reel-right  { z-index: 1; }
+.ct-swapable    { z-index: 2; }
+.ct-window      { z-index: 3; }
+.ct-sticker     { z-index: 4; }
+
+.ct-abs {
+  position: absolute;
+  display: block;
+}
+
+/* Part 1 & 2: Reels — single image assets
+   Body-relative coords: left=(canvas_x - 47)/550, top=(canvas_y - 52)/342 */
+.ct-reel-left  { left: 5.82%;  top: 11.11%; width: 44.36%; height: 71.35%; transform-origin: center; }
+.ct-reel-right { left: 60.73%; top: 28.65%; width: 22.55%; height: 36.26%; transform-origin: center; }
+
+/* Reel rotation is driven by Framer Motion useMotionValue in CassetteTapeBody.tsx */
+
+/* Part 3: Swapable body — all layers stacked in background-image (1 DOM element).
+   background-image/size/position are set via inline style in CassetteTapeBody.tsx
+   using calc(var(--cw) * frac) / calc(var(--ch) * frac) expressions. */
+.ct-swapable {
+  left: 0; top: 0;
+  /* imgSubtractBaseShadow bleeds 8px below the 342px body → need ~2.4% extra height.
+     imgEars bleeds 4px past the right edge → need ~0.8% extra width. */
+  width: calc(var(--cw) * 1.008);
+  height: calc(var(--ch) * 1.025);
+}
+
+/* Part 4: Window — pure CSS frosted-glass effect
+   Body-relative: left=(255-47)/550=37.82%, top=(174-52)/342=35.67%, w=134/550=24.36%, h=76/342=22.22% */
+.ct-window {
+  left: 37.82%; top: 35.67%;
+  width: 24.36%; height: 22.22%;
+  background: linear-gradient(48.17deg, rgba(248,248,248,0.15) 15.84%, rgba(248,248,248,0.05) 83.17%);
+  border-top: 2px solid #0d0d0d;
+  border-left: 1px solid #111;
+  border-right: 1px solid #111;
+}
+
+/* Sticker — body-relative: left=(83-47)/550=6.55%, top=(83-52)/342=9.06%, w=478/550=86.91%, h=72/342=21.05% */
+.ct-sticker {
+  left: 6.55%; top: 9.06%;
+  width: 86.91%; height: 21.05%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ct-sticker-bar {
+  flex: 1;
+  min-height: 0;
+}
+
+.ct-sticker-white {
+  flex: 4;
+  background: white;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 2%;
+  gap: 3%;
+  overflow: hidden;
+}
+
+.ct-sticker-a {
+  flex-shrink: 0;
+  background: #100f0f;
+  color: white;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  font-size: calc(var(--ch) * 0.07);
+  width: calc(var(--ch) * 0.11);
+  height: calc(var(--ch) * 0.11);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ct-sticker-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ct-sticker-genre {
+  font-size: calc(var(--ch) * 0.055);
+  font-weight: bold;
+  color: #111;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Arial, sans-serif;
+}
+
+.ct-sticker-track {
+  font-size: calc(var(--ch) * 0.038);
+  color: #444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Arial, sans-serif;
 }
 
 .cassette-label {
@@ -325,12 +527,12 @@ input[type='range'] {
 .insert-button {
   background: var(--accent);
   color: #111;
-  padding: 0.75rem 2.5rem;
+  padding: 1.25rem 4rem;
   border-radius: var(--radius);
-  font-size: 1rem;
+  font-size: 1.3rem;
   font-weight: bold;
-  font-size: 0.8rem;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
   transition: opacity 0.15s;
 }
 
@@ -338,7 +540,7 @@ input[type='range'] {
 
 .insert-button--floating {
   position: fixed;
-  top: calc(50% + 22vh);
+  top: calc(50% + 24vh);
   left: 50%;
   transform: translateX(-50%);
   z-index: 31;
@@ -348,14 +550,14 @@ input[type='range'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  gap: 2.5rem;
+  margin-top: 4rem;
 }
 
 .nav-arrow {
   color: #fff;
-  font-size: 1.2rem;
-  padding: 0.25rem 0.75rem;
+  font-size: 2rem;
+  padding: 0.6rem 1.4rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: #000;
@@ -833,6 +1035,7 @@ input[type='range'] {
   color: var(--text-dim);
   opacity: 0.5;
   text-align: right;
+  min-height: 1em;
 }
 
 /* ─── Player + filter wrapper — fixed centered ───────────── */
@@ -1135,7 +1338,7 @@ input[type='range'] {
   left: 208px; top: 42px;
   width: 409px; height: 242px;
   border-radius: 5px;
-  overflow: hidden;
+  overflow: visible;
 }
 .np-tape-bay-inner {
   position: absolute;
@@ -1150,10 +1353,17 @@ input[type='range'] {
   object-fit: contain;
   pointer-events: none;
 }
+/* Force ct-body into its own GPU compositing layer when inside the player bay.
+   This ensures ct-reel and ct-swapable always flatten together (preserving PNG
+   transparency) before being composited into the FLIP animation layer above. */
+.np-cassette-in-bay .ct-body {
+  will-change: transform;
+}
+
 /* In-bay cassette — animated from carousel via Framer Motion layoutId */
 .np-cassette-in-bay {
   position: absolute;
-  left: 39px;
+  left: 28px; /* (409 - 354) / 2 — centers 550:342 cassette in the 409px bay */
   top: 11px;
   z-index: 2;
 }
@@ -1181,26 +1391,19 @@ input[type='range'] {
   position: absolute;
   width: 81px; height: 81px;
 }
-.np-reel--left  { left: 91px;  top: 80px; }
-.np-reel--right { left: 237px; top: 80px; }
+.np-reel--left  { left: 87px;  top: 75px; }
+.np-reel--right { left: 242px; top: 74px; }
 
-.np-reel-outer,
-.np-reel-hub,
-.np-reel-spokes,
-.np-reel-c1,
-.np-reel-c2,
-.np-reel-c3 {
+/* np-reel-frame bleeds beyond the rotation anchor to account for the
+   drop shadow baked into the Figma PNG (inset values from node 51:4895) */
+.np-reel-frame {
   position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  object-fit: contain;
+  inset: 0 -19.14% -23.46% -4.94%;
 }
-.np-reel-outer  { width: 100%; height: 100%; }
-.np-reel-hub    { width: 65px; height: 65px; }
-.np-reel-spokes { width: 49.5px; height: 47px; }
-.np-reel-c1     { width: 29px; height: 29px; }
-.np-reel-c2     { width: 17px; height: 17px; }
-.np-reel-c3     { width: 8px;  height: 8px;  }
+.np-reel-img {
+  width: 100%; height: 100%;
+  display: block;
+}
 
 /* LCD Screen */
 .np-screen {

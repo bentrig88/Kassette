@@ -1,5 +1,5 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
+import { motion, useMotionValue, animate } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
 import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
@@ -11,6 +11,7 @@ import { useMotorSFX } from '../hooks/useMotorSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
 import type { AudioQuality } from '../types/music'
 import * as A from '../assets/playerAssets'
+import { CassetteTapeBody } from './CassetteTapeBody'
 
 // dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
 const DB_TICKS = [
@@ -60,6 +61,7 @@ export function CassettePlayer() {
   } = usePlayerStore()
 
   const isPlaying = playbackState === 'playing'
+
   const bars = useVUMeter(isPlaying)
   useMotorSFX(isPlaying || playbackState === 'loading')
   useAudioFilter(quality, isPlaying)
@@ -154,9 +156,10 @@ export function CassettePlayer() {
 
   const fbPressRef = useRef<{ startedAt: number; positionAt: number } | null>(null)
   function getAudioEl() { return document.querySelector('audio') as HTMLAudioElement | null }
-  function startFF() { const el = getAudioEl(); if (el) el.playbackRate = 8 }
-  function stopFF() { const el = getAudioEl(); if (el) el.playbackRate = 1 }
+  function startFF() { setReelModifier(1); const el = getAudioEl(); if (el) el.playbackRate = 8 }
+  function stopFF() { setReelModifier(0); const el = getAudioEl(); if (el) el.playbackRate = 1 }
   function startFB() {
+    setReelModifier(-1)
     const el = getAudioEl(); if (el) el.muted = true
     fbPressRef.current = { startedAt: Date.now(), positionAt: getMusicKitInstance().currentPlaybackTime }
     rewindSFX.play()
@@ -166,6 +169,7 @@ export function CassettePlayer() {
     const heldSeconds = (Date.now() - fbPressRef.current.startedAt) / 1000
     const target = Math.max(0, fbPressRef.current.positionAt - heldSeconds * 8)
     fbPressRef.current = null
+    setReelModifier(0)
     rewindSFX.stop(() => {
       try { getMusicKitInstance().seekToTime(target) } catch {/* */}
       const el = getAudioEl(); if (el) el.muted = false
@@ -177,6 +181,37 @@ export function CassettePlayer() {
     try { getMusicKitInstance().stop() } catch {/* */}
     ejectCassette()
   }
+
+  const insertSourceRect = usePlayerStore((s) => s.insertSourceRect)
+  const bayRef = useRef<HTMLDivElement>(null)
+  const bayX = useMotionValue(0)
+  const bayY = useMotionValue(0)
+  const bayScale = useMotionValue(1)
+
+  // FLIP: when the bay cassette mounts, set x/y/scale to the carousel position then
+  // animate to 0/0/1. Using Framer Motion motion values avoids the GPU compositing
+  // conflict that occurs when a CSS transition is active on a parent that also
+  // has children with CSS animations (the ct-reel spin animation).
+  useLayoutEffect(() => {
+    if (!bayRef.current || !insertSourceRect || !isInserted) return
+    const el = bayRef.current
+    // Reset motion values so getBoundingClientRect reflects natural position
+    bayX.set(0)
+    bayY.set(0)
+    bayScale.set(1)
+    const targetRect = el.getBoundingClientRect()
+    const sourceCX = insertSourceRect.left + insertSourceRect.width / 2
+    const sourceCY = insertSourceRect.top + insertSourceRect.height / 2
+    const targetCX = targetRect.left + targetRect.width / 2
+    const targetCY = targetRect.top + targetRect.height / 2
+    bayX.set(sourceCX - targetCX)
+    bayY.set(sourceCY - targetCY + 97)
+    bayScale.set(1.1)
+    animate(bayX, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
+    animate(bayY, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
+    animate(bayScale, 1, { duration: 0.3, ease: [0, 0, 0.58, 1] })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCassette?.id, isInserted])
 
   const featuresMap = usePlayerStore((s) => s.featuresMap)
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
@@ -197,9 +232,6 @@ export function CassettePlayer() {
   }, [currentTrack?.id, setTempoFilter, setEnergyFilter, setMoodFilter])
 
   const progress = duration > 0 ? currentTime / duration : 0
-  // Reel rotation: left reel unwinds (tape moving off), right reel winds up
-  const leftDeg = progress * 360
-  const rightDeg = (1 - progress) * 360
 
   // VU meter: average bar value → dB gauge position
   // dB frame: y=45, h=303. Gauge is 4px tall. At silence: bottom of frame. At peak: top.
@@ -217,6 +249,30 @@ export function CassettePlayer() {
   const [pressedBtn, setPressedBtn] = useState<string | null>(null)
   const [pendingPlay, setPendingPlay] = useState(false)
   const [knobDragX, setKnobDragX] = useState<number | null>(null)
+  // -1 = rewind held, 0 = normal, 1 = FF held
+  const [reelModifier, setReelModifier] = useState<-1 | 0 | 1>(0)
+
+  const baseActive = isPlaying || pendingPlay || playbackState === 'loading'
+  const reelSpeed = baseActive ? (reelModifier === 1 ? 3 : reelModifier === -1 ? -3 : 1) : 0
+
+  // Shared rotation for both np-reels — same direction, same speed, perfectly in sync.
+  // Imperative loop: stops instantly at the current angle (no snap-back).
+  const reelRotate = useMotionValue(0)
+  useEffect(() => {
+    if (reelSpeed === 0) return
+    const direction = reelSpeed > 0 ? 1 : -1
+    const duration = 4 / Math.abs(reelSpeed)
+    let controls: ReturnType<typeof animate> | null = null
+    function tick() {
+      controls = animate(reelRotate, reelRotate.get() + 360 * direction, {
+        duration,
+        ease: 'linear',
+        onComplete: tick,
+      })
+    }
+    tick()
+    return () => { controls?.stop() }
+  }, [reelSpeed, reelRotate])
   const knobDragRef = useRef<{ startX: number; startKnobX: number } | null>(null)
 
   function onKnobMouseDown(e: React.MouseEvent) {
@@ -331,55 +387,26 @@ export function CassettePlayer() {
 
         <img src={A.imgBackTape} alt="" className="np-back-tape" />
 
-        {/* In-bay cassette — flies in from carousel via layoutId */}
-        <AnimatePresence>
-          {isInserted && currentCassette && (
-            <motion.div
-              key={currentCassette.id}
-              layoutId={`cassette-${currentCassette.id}`}
-              className="np-cassette-in-bay"
-            >
-              <div className="cassette-body" style={{ borderColor: currentCassette.color }}>
-                <div className="cassette-label" style={{ backgroundColor: currentCassette.color }}>
-                  <span className="cassette-genre">{currentCassette.genre}</span>
-                  <span className="cassette-count">{currentCassette.tracks.length} tracks</span>
-                </div>
-                <div className="cassette-reels">
-                  <div className="cassette-reel" />
-                  <div className="cassette-tape-window" />
-                  <div className="cassette-reel" />
-                </div>
-                <div className="cassette-bottom-strip" />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* In-bay cassette — FLIP animates from carousel position via Framer Motion values */}
+        {isInserted && currentCassette && (
+          <motion.div ref={bayRef} className="np-cassette-in-bay" style={{ x: bayX, y: bayY, scale: bayScale }}>
+            <div className="cassette-body cassette-body--new">
+              <CassetteTapeBody cassette={currentCassette} reelSpeed={reelSpeed} />
+            </div>
+          </motion.div>
+        )}
 
         {/* Left reel */}
-        <motion.div
-          className="np-reel np-reel--left"
-          animate={{ rotate: isPlaying ? leftDeg : 0 }}
-          transition={{ duration: 0.5, ease: 'linear' }}
-        >
-          <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
-          <img src={A.imgReelHub} alt="" className="np-reel-hub" />
-          <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
-          <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
-          <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
-          <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+        <motion.div className="np-reel np-reel--left" style={{ rotate: reelRotate }}>
+          <div className="np-reel-frame">
+            <img src={A.imgReelLeft} alt="" className="np-reel-img" />
+          </div>
         </motion.div>
         {/* Right reel */}
-        <motion.div
-          className="np-reel np-reel--right"
-          animate={{ rotate: isPlaying ? rightDeg : 0 }}
-          transition={{ duration: 0.5, ease: 'linear' }}
-        >
-          <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
-          <img src={A.imgReelHub} alt="" className="np-reel-hub" />
-          <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
-          <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
-          <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
-          <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+        <motion.div className="np-reel np-reel--right" style={{ rotate: reelRotate }}>
+          <div className="np-reel-frame">
+            <img src={A.imgReelRight} alt="" className="np-reel-img" />
+          </div>
         </motion.div>
         {(!isInserted || !currentCassette) && (
           <div className="np-tape-empty">INSERT TAPE</div>

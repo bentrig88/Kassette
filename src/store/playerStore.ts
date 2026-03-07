@@ -22,6 +22,9 @@ interface PlayerState {
   featuresMap: Map<string, TrackFeatures>
   analyzedCount: number
 
+  insertSourceRect: { top: number; left: number; width: number; height: number } | null
+  setInsertSourceRect: (rect: { top: number; left: number; width: number; height: number } | null) => void
+
   insertCassette: (cassette: Cassette) => void
   setQueuedTracks: (tracks: Track[]) => void
   ejectCassette: () => void
@@ -60,6 +63,9 @@ export const usePlayerStore = create<PlayerState>((set) => ({
 
   featuresMap: new Map(),
   analyzedCount: 0,
+
+  insertSourceRect: null,
+  setInsertSourceRect: (rect) => set({ insertSourceRect: rect }),
 
   insertCassette: (cassette) =>
     set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [] }),

@@ -14,9 +14,23 @@ import { AuthScreen } from './components/AuthScreen'
 import { CassetteCarousel } from './components/CassetteCarousel'
 import { CassettePlayer } from './components/CassettePlayer'
 import { PlaylistController } from './components/PlaylistController'
+import { SceneBackground } from './components/SceneBackground'
 import './index.css'
 
+function usePlayerScale() {
+  useEffect(() => {
+    function update() {
+      const scale = (window.innerHeight * 0.5) / 530
+      document.documentElement.style.setProperty('--player-scale', String(scale))
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+}
+
 export default function App() {
+  usePlayerScale()
   const isAuthenticated = useMusicStore((s) => s.isAuthenticated)
   const isLoading = useMusicStore((s) => s.isLoading)
   const loadingProgress = useMusicStore((s) => s.loadingProgress)
@@ -122,31 +136,38 @@ export default function App() {
   }
 
   return (
+    <>
+    <SceneBackground />
     <div className="app">
-      {!isInserted && (
-        <div className="app-header">
-          <span className="app-logo">Kassette</span>
-          <button
-            className="signout-btn"
-            onClick={async () => {
-              try {
-                getMusicKitInstance().stop()
-                await getMusicKitInstance().unauthorize()
-              } catch {/* */}
-              setAuthenticated(false)
-              setCassettes([])
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      )}
+      <div className="app-header">
+        <span className="app-logo">Kassette</span>
+        <button
+          className="signout-btn"
+          onClick={async () => {
+            try {
+              getMusicKitInstance().stop()
+              await getMusicKitInstance().unauthorize()
+            } catch {/* */}
+            setAuthenticated(false)
+            setCassettes([])
+          }}
+        >
+          Sign out
+        </button>
+      </div>
 
-      <div className={`app-main ${isInserted ? 'app-main--playing' : ''}`}>
+      <div className="app-main">
         <CassetteCarousel />
-        <CassettePlayer />
-        <PlaylistController />
+        <div className="player-filter-wrapper">
+          <div className="player-scale-container">
+            <div className="np-player-wrapper">
+              <CassettePlayer />
+            </div>
+          </div>
+          <PlaylistController />
+        </div>
       </div>
     </div>
+    </>
   )
 }

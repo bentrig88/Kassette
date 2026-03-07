@@ -265,7 +265,65 @@ Do NOT add `transform: translate(-50%, -50%)` — Framer Motion overrides `trans
 
 ---
 
+## Cassette Insert FLIP Animation
+
+### Overview
+When the user clicks "Insert Tape", the selected cassette animates from its lifted carousel position into the player's tape bay via a manual FLIP animation (no Framer Motion `layoutId`).
+
+### Implementation
+1. **Source rect capture**: Before the lift starts, `[data-insert-target]` (the `.cassette-item` wrapper) is measured for `liftY`. After the 500ms lift animation, `[data-flip-source]` (the `motion.div` that includes the translateY) is measured for the FLIP source rect and stored in `playerStore.insertSourceRect`.
+2. **Target rect + FLIP**: In a `useLayoutEffect` in `CassettePlayer`, the bay element (`bayRef`) is measured. Center-based dx/dy are computed (not top-left), and `bayX`, `bayY`, `bayScale` motion values are set to the delta, then animated to 0/0/1.
+3. **Carousel instant exit**: `carousel-wrapper` exits with `transition: { duration: 0 }` so it disappears the moment `isInserted` becomes true, avoiding overlap with the FLIP.
+4. **Easing**: `{ duration: 0.3, ease: [0, 0, 0.58, 1] }` — pure ease-out.
+
+### Key values
+- Source scale baked in at 1.1 (`bayScale.set(1.1)`)
+- `bayY` offset: `sourceCY - targetCY + 97` (empirically tuned for the visual center of the tape bay)
+- `data-flip-source` on the `motion.div` (includes lift transform), `data-insert-target` on the static `.cassette-item` wrapper
+
+### Known issue — ct-reel compositing
+During the FLIP animation, the reel images (visible through the cassette window) temporarily disappear and reappear when the animation ends. Root cause: `np-cassette-in-bay` gets a GPU compositing layer from Framer Motion's transform. Within that layer, the transparent PNG cutout in `ct-swapable` can fail to composite correctly against the reel images below it. Attempted fixes: CSS animation → Framer Motion motion values → rAF-driven `style.transform` → `will-change: transform` on `.np-cassette-in-bay .ct-body`. Issue is pending a Layers panel inspection in Chrome DevTools to confirm which element is being unexpectedly promoted.
+
+### Reel animation
+CSS `animation: ct-spin-cw` was replaced with a `requestAnimationFrame` loop in `CassetteTapeBody` that directly sets `img.style.transform = rotate(Xdeg)`. This avoids CSS animation's implicit GPU layer promotion. When `reelSpeed === 0` (always during FLIP), the transform is cleared entirely so no compositing layer is created on the reel elements.
+
+---
+
+## Scene Background System
+
+### Overview
+A full-screen background layer rendered behind all UI, with per-cassette/genre background image and decorative PNG objects positioned around the player.
+
+### Files
+- `src/assets/background-generic.jpg` — generic background (1376×1046)
+- `src/assets/object-generic-1.png` — decorative object 1 (880×1204)
+- `src/assets/object-generic-2.png` — decorative object 2 (689×989)
+- `src/assets/object-generic-3.png` — decorative object 3 (482×1048)
+- `src/components/SceneBackground.tsx` — renders the background + 3 objects
+
+### CSS structure
+```css
+.scene-root   /* position: fixed; inset: 0; z-index: 0; pointer-events: none */
+.scene-bg     /* position: absolute; inset: 0; background-size: cover */
+.scene-obj    /* position: absolute; bottom: 0; width: auto */
+.scene-obj-1/2/3  /* individual positioning per object */
+```
+
+### Scaling
+Objects use `calc(var(--player-scale, 1) * Xpx)` for `height` so they resize proportionally with the player on every viewport size. `--player-scale` is set by `usePlayerScale()` in `App.tsx` as `(window.innerHeight * 0.5) / 530`.
+
+### Positioning pattern
+Each object has `left`/`right`, `top`, `bottom: auto`, `height` (player-scale relative), and `rotate` properties. Horizontal offset combines a viewport-percentage and a player-scale-relative offset:
+```css
+left: calc(60% + var(--player-scale, 1) * 410px);
+```
+
+### App header
+Updated to `background: rgba(0,0,0,0.45)` with `backdrop-filter: blur(8px)` so the background image shows through.
+
+---
+
 ## Phases
 - **Phase 1** ✅ — Auth, genre cassettes, player controls, queue, VU meter, tape filter, SFX
 - **Phase 2** ✅ — Preview-based audio analysis, BPM/energy/mood sliders, background analysis, smart queue sorting
-- **Phase 3** 🚧 — Visual redesign: Figma-matched pixel-perfect UI, physical button animations, asset refresh pipeline
+- **Phase 3** 🚧 — Visual redesign: Figma-matched pixel-perfect UI, physical button animations, asset refresh pipeline, scene background system
