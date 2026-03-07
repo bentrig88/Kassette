@@ -160,12 +160,17 @@ input[type='range'] {
 }
 
 .app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 2rem;
   border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  z-index: 25;
+  background: var(--bg);
 }
 
 .app-logo {
@@ -193,40 +198,51 @@ input[type='range'] {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
-  padding: 1.5rem 1rem;
-  gap: 1.5rem;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+/* ─── Blur overlay — behind carousel, above player ─────────── */
+.carousel-blur-overlay {
+  position: fixed;
+  inset: 0;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 20;
+  pointer-events: none;
 }
 
 /* ─── Cassette Carousel ────────────────────────────────────── */
 .carousel-wrapper {
-  width: 100%;
-  max-width: 900px;
-  flex-shrink: 0;
+  position: fixed;
+  top: 50%;
+  left: 0;
+  width: 100vw;
+  transform: translateY(-50%);
+  z-index: 30;
 }
 
 .carousel-track-container {
-  overflow: hidden;
+  overflow: visible;
   width: 100%;
   padding: 1rem 0 0.5rem;
   cursor: grab;
+  /* horizontal padding set via inline style in component (half of cassette width) */
 }
 
 .carousel-track-container:active { cursor: grabbing; }
 
 .carousel-track {
   display: flex;
-  gap: 32px;
-  align-items: flex-end;
-  padding: 0 calc(50% - 110px);
+  /* gap set via inline style in component */
+  align-items: center;
 }
 
 .cassette-item {
   flex-shrink: 0;
-  width: 220px;
+  /* width set via inline style from dims.width */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -234,8 +250,9 @@ input[type='range'] {
 }
 
 .cassette-body {
-  width: 100%;
-  height: 140px;
+  --ch: 22vh;
+  height: var(--ch);
+  aspect-ratio: 15 / 10;
   background: #111;
   border: 3px solid #555;
   border-radius: 8px;
@@ -249,9 +266,9 @@ input[type='range'] {
 .cassette-label {
   width: 75%;
   background: #ccc;
-  margin: 10px auto 0;
+  margin: calc(var(--ch) * 10 / 140) auto 0;
   border-radius: 3px;
-  padding: 6px 8px;
+  padding: calc(var(--ch) * 6 / 140) calc(var(--ch) * 8 / 140);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -259,7 +276,7 @@ input[type='range'] {
 }
 
 .cassette-genre {
-  font-size: 0.85rem;
+  font-size: calc(var(--ch) * 12 / 140);
   font-weight: bold;
   color: #111;
   letter-spacing: 1px;
@@ -267,7 +284,7 @@ input[type='range'] {
 }
 
 .cassette-count {
-  font-size: 0.65rem;
+  font-size: calc(var(--ch) * 9 / 140);
   color: #333;
 }
 
@@ -276,13 +293,13 @@ input[type='range'] {
   align-items: center;
   justify-content: space-around;
   width: 100%;
-  padding: 0 16px;
-  margin-top: 10px;
+  padding: 0 calc(var(--ch) * 16 / 140);
+  margin-top: calc(var(--ch) * 10 / 140);
 }
 
 .cassette-reel {
-  width: 34px;
-  height: 34px;
+  width: calc(var(--ch) * 34 / 140);
+  height: calc(var(--ch) * 34 / 140);
   border-radius: 50%;
   background: #222;
   border: 3px solid #555;
@@ -290,8 +307,8 @@ input[type='range'] {
 }
 
 .cassette-tape-window {
-  width: 50px;
-  height: 20px;
+  width: calc(var(--ch) * 50 / 140);
+  height: calc(var(--ch) * 20 / 140);
   background: #1a1a1a;
   border-radius: 3px;
   border: 2px solid #444;
@@ -301,15 +318,16 @@ input[type='range'] {
   position: absolute;
   bottom: 0;
   width: 100%;
-  height: 12px;
+  height: calc(var(--ch) * 12 / 140);
   background: #222;
 }
 
 .insert-button {
   background: var(--accent);
   color: #111;
-  padding: 0.4rem 1.25rem;
+  padding: 0.75rem 2.5rem;
   border-radius: var(--radius);
+  font-size: 1rem;
   font-weight: bold;
   font-size: 0.8rem;
   letter-spacing: 1px;
@@ -318,21 +336,30 @@ input[type='range'] {
 
 .insert-button:hover { opacity: 0.85; }
 
+.insert-button--floating {
+  position: fixed;
+  top: calc(50% + 22vh);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 31;
+}
+
 .carousel-nav {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1.5rem;
-  margin-top: 0.5rem;
+  margin-top: 1.5rem;
 }
 
 .nav-arrow {
-  color: var(--text-dim);
+  color: #fff;
   font-size: 1.2rem;
   padding: 0.25rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: color 0.15s, border-color 0.15s;
+  background: #000;
+  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
 }
 
 .nav-arrow:hover:not(:disabled) {
@@ -740,6 +767,7 @@ input[type='range'] {
 
 /* ─── Playlist Controller ──────────────────────────────────── */
 .playlist-controller {
+  z-index: 5;
   background: var(--surface);
   border: 2px solid var(--border);
   border-radius: 12px;
@@ -807,6 +835,44 @@ input[type='range'] {
   text-align: right;
 }
 
+/* ─── Player + filter wrapper — fixed centered ───────────── */
+.player-filter-wrapper {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10vh;
+  pointer-events: none;
+}
+.player-filter-wrapper > * { pointer-events: auto; }
+
+/* Scale container gives layout the correct visual dimensions */
+.player-scale-container {
+  position: relative;
+  width: calc(var(--player-scale, 1) * 824px);
+  height: calc(var(--player-scale, 1) * 513px);
+}
+
+/* ─── Player wrapper — inside scale container ────────────── */
+.np-player-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 824px;
+  height: 513px;
+  overflow: visible;
+  transform: translate(-50%, -50%) scale(var(--player-scale, 1));
+  transform-origin: center center;
+  pointer-events: none;
+}
+.np-player-wrapper .np-player {
+  pointer-events: auto;
+}
+
 /* ─── New Player (Figma design) ────────────────────────────── */
 
 /* Container */
@@ -822,7 +888,7 @@ input[type='range'] {
 .np-body-shadow {
   position: absolute;
   left: 0; top: 4px;
-  width: 865px; height: 547px;
+  width: 905px; height: 597px;
   pointer-events: none;
   z-index: 0;
 }
@@ -1078,11 +1144,26 @@ input[type='range'] {
 }
 .np-back-tape {
   position: absolute;
-  left: 15px; top: 14px;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
   width: 350px; height: 220px;
   object-fit: contain;
   pointer-events: none;
 }
+/* In-bay cassette — animated from carousel via Framer Motion layoutId */
+.np-cassette-in-bay {
+  position: absolute;
+  left: 39px;
+  top: 11px;
+  z-index: 2;
+}
+.np-cassette-in-bay .cassette-body {
+  /* 220px matches np-back-tape height in the player's native coordinate space.
+     The parent .np-player-wrapper already applies scale(--player-scale),
+     so no further multiplication needed here. */
+  --ch: 220px;
+}
+
 .np-tape-empty {
   position: absolute;
   inset: 0;
@@ -1100,8 +1181,8 @@ input[type='range'] {
   position: absolute;
   width: 81px; height: 81px;
 }
-.np-reel--left  { left: 87px;  top: 63px; }
-.np-reel--right { left: 233px; top: 63px; }
+.np-reel--left  { left: 91px;  top: 80px; }
+.np-reel--right { left: 237px; top: 80px; }
 
 .np-reel-outer,
 .np-reel-hub,
@@ -1110,14 +1191,16 @@ input[type='range'] {
 .np-reel-c2,
 .np-reel-c3 {
   position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
   object-fit: contain;
 }
-.np-reel-outer  { inset: 0; width: 100%; height: 100%; }
-.np-reel-hub    { left: 8px; top: 8px; width: 65px; height: 65px; }
-.np-reel-spokes { left: 27px; top: 33px; width: 49.5px; height: 47px; }
-.np-reel-c1     { left: 21px; top: 24px; width: 29px; height: 29px; }
-.np-reel-c2     { left: 27px; top: 30px; width: 17px; height: 17px; }
-.np-reel-c3     { left: 32px; top: 35px; width: 8px;  height: 8px;  }
+.np-reel-outer  { width: 100%; height: 100%; }
+.np-reel-hub    { width: 65px; height: 65px; }
+.np-reel-spokes { width: 49.5px; height: 47px; }
+.np-reel-c1     { width: 29px; height: 29px; }
+.np-reel-c2     { width: 17px; height: 17px; }
+.np-reel-c3     { width: 8px;  height: 8px;  }
 
 /* LCD Screen */
 .np-screen {

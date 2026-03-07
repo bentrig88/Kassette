@@ -1,11 +1,13 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
 import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
 import { useVUMeter } from '../hooks/useVUMeter'
 import { useAudioFilter } from '../hooks/useAudioFilter'
 import { useRewindSFX } from '../hooks/useRewindSFX'
+import { useButtonSFX } from '../hooks/useButtonSFX'
+import { useMotorSFX } from '../hooks/useMotorSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
 import type { AudioQuality } from '../types/music'
 import * as A from '../assets/playerAssets'
@@ -59,8 +61,10 @@ export function CassettePlayer() {
 
   const isPlaying = playbackState === 'playing'
   const bars = useVUMeter(isPlaying)
+  useMotorSFX(isPlaying || playbackState === 'loading')
   useAudioFilter(quality, isPlaying)
   const rewindSFX = useRewindSFX()
+  const { playReg, playEject } = useButtonSFX()
 
   const queuedTracksRef = useRef(queuedTracks)
   queuedTracksRef.current = queuedTracks
@@ -80,10 +84,10 @@ export function CassettePlayer() {
     const onStateChange = () => {
       const state = music.playbackState
       const states = MusicKit.PlaybackStates
-      if (state === states.playing) setPlaybackState('playing')
-      else if (state === states.paused) setPlaybackState('paused')
-      else if (state === states.stopped) setPlaybackState('stopped')
-      else if (state === states.loading || state === states.waiting) setPlaybackState('loading')
+      if (state === states.playing) { setPlaybackState('playing'); setPendingPlay(false) }
+      else if (state === states.paused) { setPlaybackState('paused') }
+      else if (state === states.stopped) { setPlaybackState('stopped') }
+      else if (state === states.loading || state === states.waiting) { setPlaybackState('loading'); setPendingPlay(true) }
       else if (state === states.completed) {
         setPlaybackState('stopped')
         const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
@@ -131,9 +135,12 @@ export function CassettePlayer() {
     try {
       const music = getMusicKitInstance()
       if (playbackState === 'playing') { music.stop(); return }
-      if (playbackState !== 'paused') music.stop()
+      if (playbackState !== 'paused') {
+        music.stop()
+        setPendingPlay(true)
+      }
       await music.play()
-    } catch (e) { console.error(e) }
+    } catch (e) { setPendingPlay(false); console.error(e) }
   }
 
   function handlePause() {
@@ -143,7 +150,7 @@ export function CassettePlayer() {
       else music.pause()
     } catch {/* */}
   }
-  function handleStop() { try { getMusicKitInstance().stop(); setCurrentTime(0) } catch {/* */} }
+  function handleStop() { setPendingPlay(false); try { getMusicKitInstance().stop(); setCurrentTime(0) } catch {/* */} }
 
   const fbPressRef = useRef<{ startedAt: number; positionAt: number } | null>(null)
   function getAudioEl() { return document.querySelector('audio') as HTMLAudioElement | null }
@@ -165,6 +172,7 @@ export function CassettePlayer() {
     })
   }
   async function handleEject() {
+    setPendingPlay(false)
     fbPressRef.current = null; stopFF()
     try { getMusicKitInstance().stop() } catch {/* */}
     ejectCassette()
@@ -207,6 +215,7 @@ export function CassettePlayer() {
   const qualityLabels: AudioQuality[] = ['lo', 'mid', 'hi']
 
   const [pressedBtn, setPressedBtn] = useState<string | null>(null)
+  const [pendingPlay, setPendingPlay] = useState(false)
   const [knobDragX, setKnobDragX] = useState<number | null>(null)
   const knobDragRef = useRef<{ startX: number; startKnobX: number } | null>(null)
 
@@ -320,37 +329,59 @@ export function CassettePlayer() {
           boxShadow: 'inset 0px 8px 1px 0px black',
         }} />
 
-        {isInserted && currentCassette ? (
-          <>
-            <img src={A.imgBackTape} alt="" className="np-back-tape" />
-            {/* Left reel */}
+        <img src={A.imgBackTape} alt="" className="np-back-tape" />
+
+        {/* In-bay cassette — flies in from carousel via layoutId */}
+        <AnimatePresence>
+          {isInserted && currentCassette && (
             <motion.div
-              className="np-reel np-reel--left"
-              animate={{ rotate: isPlaying ? leftDeg : 0 }}
-              transition={{ duration: 0.5, ease: 'linear' }}
+              key={currentCassette.id}
+              layoutId={`cassette-${currentCassette.id}`}
+              className="np-cassette-in-bay"
             >
-              <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
-              <img src={A.imgReelHub} alt="" className="np-reel-hub" />
-              <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
-              <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
-              <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
-              <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+              <div className="cassette-body" style={{ borderColor: currentCassette.color }}>
+                <div className="cassette-label" style={{ backgroundColor: currentCassette.color }}>
+                  <span className="cassette-genre">{currentCassette.genre}</span>
+                  <span className="cassette-count">{currentCassette.tracks.length} tracks</span>
+                </div>
+                <div className="cassette-reels">
+                  <div className="cassette-reel" />
+                  <div className="cassette-tape-window" />
+                  <div className="cassette-reel" />
+                </div>
+                <div className="cassette-bottom-strip" />
+              </div>
             </motion.div>
-            {/* Right reel */}
-            <motion.div
-              className="np-reel np-reel--right"
-              animate={{ rotate: isPlaying ? rightDeg : 0 }}
-              transition={{ duration: 0.5, ease: 'linear' }}
-            >
-              <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
-              <img src={A.imgReelHub} alt="" className="np-reel-hub" />
-              <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
-              <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
-              <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
-              <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
-            </motion.div>
-          </>
-        ) : (
+          )}
+        </AnimatePresence>
+
+        {/* Left reel */}
+        <motion.div
+          className="np-reel np-reel--left"
+          animate={{ rotate: isPlaying ? leftDeg : 0 }}
+          transition={{ duration: 0.5, ease: 'linear' }}
+        >
+          <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
+          <img src={A.imgReelHub} alt="" className="np-reel-hub" />
+          <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
+          <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
+          <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
+          <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+        </motion.div>
+        {/* Right reel */}
+        <motion.div
+          className="np-reel np-reel--right"
+          animate={{ rotate: isPlaying ? rightDeg : 0 }}
+          transition={{ duration: 0.5, ease: 'linear' }}
+        >
+          <img src={A.imgReelOuter} alt="" className="np-reel-outer" />
+          <img src={A.imgReelHub} alt="" className="np-reel-hub" />
+          <img src={A.imgReelSpokes} alt="" className="np-reel-spokes" />
+          <img src={A.imgReelCenter1} alt="" className="np-reel-c1" />
+          <img src={A.imgReelCenter2} alt="" className="np-reel-c2" />
+          <img src={A.imgReelCenter3} alt="" className="np-reel-c3" />
+        </motion.div>
+        {(!isInserted || !currentCassette) && (
           <div className="np-tape-empty">INSERT TAPE</div>
         )}
       </div>
@@ -448,7 +479,7 @@ export function CassettePlayer() {
         <button
           className="np-btn"
           disabled={!isInserted || !isPlaying}
-          onMouseDown={(e) => { setPressedBtn('rewind'); startFB(e) }}
+          onMouseDown={(e) => { playReg(); setPressedBtn('rewind'); startFB(e) }}
           onMouseUp={(e) => { setPressedBtn(null); stopFB(e) }}
           onMouseLeave={(e) => { setPressedBtn(null); stopFB(e) }}
           onTouchStart={(e) => { setPressedBtn('rewind'); startFB(e) }}
@@ -464,7 +495,7 @@ export function CassettePlayer() {
         </button>
         {/* STOP */}
         <button className="np-btn" onClick={handleStop} disabled={!isInserted || playbackState === 'stopped'}
-          onMouseDown={() => setPressedBtn('stop')} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
+          onMouseDown={() => { playReg(); setPressedBtn('stop') }} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'stop' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
             <div className="np-btn-inner">
@@ -475,7 +506,7 @@ export function CassettePlayer() {
         </button>
         {/* PAUSE */}
         <button className="np-btn" onClick={handlePause} disabled={!isInserted || (playbackState !== 'playing' && playbackState !== 'paused')}
-          onMouseDown={() => setPressedBtn('pause')} onMouseUp={() => { if (playbackState === 'paused') setPressedBtn(null) }} onMouseLeave={() => setPressedBtn(null)}>
+          onMouseDown={() => { playReg(); setPressedBtn('pause') }} onMouseUp={() => { if (playbackState === 'paused') setPressedBtn(null) }} onMouseLeave={() => setPressedBtn(null)}>
           <div className={`np-btn-slot np-btn-slot--sm${(pressedBtn === 'pause' || playbackState === 'paused') ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
             <div className="np-btn-inner">
@@ -486,8 +517,10 @@ export function CassettePlayer() {
         </button>
         {/* PLAY */}
         <button className="np-btn" onClick={handlePlay} disabled={!isInserted}
-          onMouseDown={() => setPressedBtn('play')} onMouseUp={() => { if (playbackState === 'playing') setPressedBtn(null) }} onMouseLeave={() => setPressedBtn(null)}>
-          <div className={`np-btn-slot np-btn-slot--sm${(pressedBtn === 'play' || playbackState === 'playing' || playbackState === 'paused') ? ' np-btn-slot--pressed' : ''}`}>
+          onMouseDown={() => { playReg(); setPressedBtn('play') }}
+          onMouseUp={() => { if (playbackState === 'playing') setPressedBtn(null) }}
+          onMouseLeave={() => setPressedBtn(null)}>
+          <div className={`np-btn-slot np-btn-slot--sm${(pressedBtn === 'play' || pendingPlay || playbackState === 'playing' || playbackState === 'paused') ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
             <div className="np-btn-inner">
               <img src={A.imgPlayButton} alt="Play" className="np-btn-img" />
@@ -499,7 +532,7 @@ export function CassettePlayer() {
         <button
           className="np-btn"
           disabled={!isInserted || !isPlaying}
-          onMouseDown={(e) => { setPressedBtn('ff'); startFF(e) }}
+          onMouseDown={(e) => { playReg(); setPressedBtn('ff'); startFF(e) }}
           onMouseUp={(e) => { setPressedBtn(null); stopFF(e) }}
           onMouseLeave={(e) => { setPressedBtn(null); stopFF(e) }}
           onTouchStart={(e) => { setPressedBtn('ff'); startFF(e) }}
@@ -515,7 +548,7 @@ export function CassettePlayer() {
         </button>
         {/* EJECT */}
         <button className="np-btn" onClick={handleEject} disabled={!isInserted}
-          onMouseDown={() => setPressedBtn('eject')} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
+          onMouseDown={() => { playEject(); setPressedBtn('eject') }} onMouseUp={() => setPressedBtn(null)} onMouseLeave={() => setPressedBtn(null)}>
           <div className={`np-btn-slot np-btn-slot--lg${pressedBtn === 'eject' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
             <div className="np-btn-inner">

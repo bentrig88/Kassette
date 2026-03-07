@@ -35,6 +35,8 @@ src/
     useVUMeter.ts       Simulated animated VU meter bars
     useAudioFilter.ts   Web Audio low-pass filter for tape quality simulation
     useRewindSFX.ts     SFX chain for fast-backward (start → loop → end)
+    useButtonSFX.ts     One-shot SFX for transport button presses (reg + eject variants)
+    useMotorSFX.ts      Looping motor SFX that runs while playbackState is playing or loading
   components/
     AuthScreen.tsx          Apple Music connect UI
     CassetteCarousel.tsx    Draggable genre cassette carousel
@@ -44,6 +46,9 @@ src/
     SFX-rewinding-start.aac
     SFX-rewinding-loop-2.aac
     SFX-rewinding-end.aac
+    SFX-kassette-button-reg-pressed.aac
+    SFX-kassette-button-eject-pressed.aac
+    SFX-kassette-player-motor-loop.aac
   App.tsx     Auth gate, library loading, layout orchestration
   index.css   All styles (CSS custom properties, dark hardware theme)
 ```
@@ -97,6 +102,17 @@ Three `.aac` files sequenced in `useRewindSFX`:
 1. `SFX-rewinding-start.aac` — plays once on button press
 2. `SFX-rewinding-loop-2.aac` — loops while button is held
 3. `SFX-rewinding-end.aac` — plays on release; seek + unmute happen in its `onended` callback
+
+### Button press SFX (`useButtonSFX`)
+Two `new Audio()` elements (not in the DOM), lazily initialised on first press.
+- `SFX-kassette-button-reg-pressed.aac` — all transport buttons except eject
+- `SFX-kassette-button-eject-pressed.aac` — eject button only
+Each press resets `currentTime = 0` before calling `.play()` so rapid clicks re-trigger cleanly.
+
+### Motor SFX (`useMotorSFX`)
+`SFX-kassette-player-motor-loop.aac` loops at `volume: 0.4` whenever `isPlaying || playbackState === 'loading'`.
+Starts as soon as the track begins buffering (not just when audio starts) for a realistic feel.
+Plain `new Audio()` — not routed through Web Audio, so it plays independently of the tape quality filter.
 
 ### VU meter
 DRM blocks real Web Audio analysis so the VU meter is a visual simulation.
@@ -230,6 +246,22 @@ Do NOT call `music.stop()` before `music.play()` after `setQueue`. `setQueue` re
 ### Audio Filter (useAudioFilter)
 `createMediaElementSource` is attempted 300ms after `isPlaying` becomes true (delay lets MusicKit finish its own audio setup). Never permanently blocks on error — retries each time `isPlaying` transitions. Detects element swaps between tracks via element reference comparison.
 MutationObserver approach was tried but broke MusicKit's DRM init by firing during `setQueue`. The 300ms delayed `isPlaying` trigger is the correct approach.
+Element selection uses `document.querySelectorAll('audio')[0]` (not `querySelector`) so the list can be inspected for debugging.
+
+### Play button loading latch (`pendingPlay`)
+MusicKit fires state transitions in this order on first play: `playing → waiting → loading → playing`.
+The transient `playing` event clears any "button pressed" flag, then `waiting/loading` drops `playbackState` to `'loading'`, leaving the button unpressed during buffering.
+Fix: `pendingPlay` boolean state in `CassettePlayer`.
+- Set `true` in `handlePlay` (when not resuming from pause)
+- Re-set `true` whenever `loading` or `waiting` state fires (re-latches after the transient `playing`)
+- Cleared only when a stable `playing` state fires, or explicitly on Stop/Eject
+- Play button pressed condition: `pressedBtn === 'play' || pendingPlay || playbackState === 'playing' || playbackState === 'paused'`
+
+### In-bay cassette sizing
+`.np-cassette-in-bay .cassette-body` must use `--ch: 220px` (fixed player-coordinate pixels).
+Do **not** multiply by `--player-scale` — the parent `.np-player-wrapper` already applies `transform: scale(--player-scale)`, so multiplying again double-scales the cassette relative to the back tape image.
+Position `left: 39px; top: 11px` is correct (centres the 330×220 cassette over the 350×220 back tape).
+Do NOT add `transform: translate(-50%, -50%)` — Framer Motion overrides `transform` on `layoutId` elements for the fly-in animation.
 
 ---
 

@@ -1,14 +1,22 @@
-import { useCallback, useRef, useEffect } from 'react'
-import { motion, useMotionValue, animate } from 'framer-motion'
+import { useCallback, useRef, useEffect, useState } from 'react'
+import { motion, useMotionValue, animate, AnimatePresence } from 'framer-motion'
+import type { AnimationPlaybackControls } from 'framer-motion'
 import { useMusicStore } from '../store/musicStore'
 import { usePlayerStore } from '../store/playerStore'
 import { loadCassetteQueue } from '../services/appleMusic'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import type { Cassette } from '../types/music'
 
-const CASSETTE_WIDTH = 220
-const CASSETTE_GAP = 32
-const ITEM_WIDTH = CASSETTE_WIDTH + CASSETTE_GAP
+const BASE_CASSETTE_GAP = 100
+const BASE_CASSETTE_HEIGHT = 140
+const SPRING = { type: 'spring' as const, stiffness: 300, damping: 30 }
+
+function getCassetteDims() {
+  const height = window.innerHeight * 0.22
+  const width = Math.round(height * 15 / 10)
+  const gap = Math.round(height * BASE_CASSETTE_GAP / BASE_CASSETTE_HEIGHT)
+  return { width, gap, itemWidth: width + gap }
+}
 
 export function CassetteCarousel() {
   const cassettes = useMusicStore((s) => s.cassettes)
@@ -19,25 +27,92 @@ export function CassetteCarousel() {
   const insertCassette = usePlayerStore((s) => s.insertCassette)
   const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
 
-  const x = useMotionValue(0)
-  const dragConstraints = useRef<HTMLDivElement>(null)
+  const N = cassettes.length
 
-  // Sync x position when selectedIndex changes (e.g. keyboard nav)
+  const [dims, setDims] = useState(getCassetteDims)
+  const dimsRef = useRef(dims)
+  dimsRef.current = dims
+
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
   useEffect(() => {
-    animate(x, -(selectedIndex * ITEM_WIDTH), {
-      type: 'spring',
-      stiffness: 300,
-      damping: 30,
+    function update() {
+      setDims(getCassetteDims())
+      setWindowWidth(window.innerWidth)
+    }
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  // virtualIndex lives in the tripled array. Middle set = [N, 2N).
+  const [virtualIndex, setVirtualIndex] = useState(() => N + selectedIndex)
+  const virtualIndexRef = useRef(N + selectedIndex)
+  virtualIndexRef.current = virtualIndex
+
+  const x = useMotionValue(N > 0 ? -((N + selectedIndex) * dims.itemWidth) : 0)
+  const prevItemWidthRef = useRef(dims.itemWidth)
+
+  // Running animation controls — stopped before starting a new one.
+  const animControls = useRef<AnimationPlaybackControls | null>(null)
+  // Incremented each time we start a new animation. Lets onComplete detect staleness.
+  const animVersionRef = useRef(0)
+  // Set true before a silent teleport so the sync effect skips re-animating.
+  const isTeleportingRef = useRef(false)
+
+  // Animate x whenever virtualIndex or itemWidth changes.
+  // When the animation finishes, silently teleport back to the middle set if needed.
+  useEffect(() => {
+    if (isTeleportingRef.current) {
+      isTeleportingRef.current = false
+      return
+    }
+    const isResize = prevItemWidthRef.current !== dims.itemWidth
+    prevItemWidthRef.current = dims.itemWidth
+    animControls.current?.stop()
+    if (isResize) {
+      x.set(-(virtualIndexRef.current * dims.itemWidth))
+      return
+    }
+    const version = ++animVersionRef.current
+    animControls.current = animate(x, -(virtualIndex * dims.itemWidth), {
+      ...SPRING,
+      onComplete: () => {
+        if (animVersionRef.current !== version) return
+        const vi = virtualIndexRef.current
+        if (vi < N || vi >= 2 * N) {
+          // Normalise vi into middle set [N, 2N)
+          const normalVi = ((vi % N) + N) % N + N
+          animControls.current = null
+          isTeleportingRef.current = true
+          x.set(-(normalVi * dimsRef.current.itemWidth))
+          setVirtualIndex(normalVi)
+          virtualIndexRef.current = normalVi
+        }
+      },
     })
-  }, [selectedIndex, x])
+  // setVirtualIndex is stable (useState setter); N is stable after library loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtualIndex, dims.itemWidth, x, N])
+
+  // Snap instantly on viewport width change
+  useEffect(() => {
+    animControls.current?.stop()
+    x.set(-(virtualIndexRef.current * dimsRef.current.itemWidth))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowWidth])
 
   const goLeft = useCallback(() => {
-    setSelectedIndex(Math.max(0, selectedIndex - 1))
-  }, [selectedIndex, setSelectedIndex])
+    const newVi = Math.max(0, virtualIndexRef.current - 1)
+    setVirtualIndex(newVi)
+    virtualIndexRef.current = newVi
+    setSelectedIndex(((newVi % N) + N) % N)
+  }, [N, setSelectedIndex])
 
   const goRight = useCallback(() => {
-    setSelectedIndex(Math.min(cassettes.length - 1, selectedIndex + 1))
-  }, [selectedIndex, cassettes.length, setSelectedIndex])
+    const newVi = Math.min(3 * N - 1, virtualIndexRef.current + 1)
+    setVirtualIndex(newVi)
+    virtualIndexRef.current = newVi
+    setSelectedIndex(((newVi % N) + N) % N)
+  }, [N, setSelectedIndex])
 
   useKeyboardNav(goLeft, goRight, !isInserted)
 
@@ -49,54 +124,103 @@ export function CassetteCarousel() {
 
   if (cassettes.length === 0) return null
 
-  const totalWidth = cassettes.length * ITEM_WIDTH
+  const extendedCassettes = [...cassettes, ...cassettes, ...cassettes]
+  const totalWidth = extendedCassettes.length * dims.itemWidth
+  const realIndex = ((virtualIndex % N) + N) % N
+  const selectedCassette = cassettes[realIndex]
+  const selectedIsInserted = isInserted && currentCassette?.id === selectedCassette?.id
 
   return (
-    <div className="carousel-wrapper">
-      <div className="carousel-track-container" ref={dragConstraints}>
-        <motion.div
-          className="carousel-track"
-          drag="x"
-          dragConstraints={dragConstraints}
-          style={{ x, width: totalWidth }}
-          onDragEnd={() => {
-            const currentX = x.get()
-            const index = Math.round(-currentX / ITEM_WIDTH)
-            const clamped = Math.max(0, Math.min(cassettes.length - 1, index))
-            setSelectedIndex(clamped)
-            // The useEffect above will animate to the snapped position
-          }}
-        >
-          {cassettes.map((cassette, i) => (
-            <CassetteItem
-              key={cassette.id}
-              cassette={cassette}
-              isSelected={i === selectedIndex}
-              isInserted={isInserted && currentCassette?.id === cassette.id}
-              onInsert={() => handleInsert(cassette)}
-            />
-          ))}
-        </motion.div>
-      </div>
+    <>
+      <AnimatePresence>
+        {!isInserted && (
+          <motion.div
+            key="blur-overlay"
+            className="carousel-blur-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+          />
+        )}
+      </AnimatePresence>
 
-      <div className="carousel-nav">
-        <button
-          className="nav-arrow"
-          onClick={goLeft}
-          disabled={selectedIndex === 0}
-        >
-          &#8592;
-        </button>
-        <span className="carousel-counter">{selectedIndex + 1} / {cassettes.length}</span>
-        <button
-          className="nav-arrow"
-          onClick={goRight}
-          disabled={selectedIndex === cassettes.length - 1}
-        >
-          &#8594;
-        </button>
-      </div>
-    </div>
+      <AnimatePresence>
+        {!isInserted && (
+          <motion.div
+            key="carousel-wrapper"
+            className="carousel-wrapper"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div
+              className="carousel-track-container"
+              style={{ padding: `0 calc(50% - ${dims.width / 2}px)` }}
+            >
+              <motion.div
+                className="carousel-track"
+                drag="x"
+                style={{ x, width: totalWidth, gap: dims.gap }}
+                onDragEnd={() => {
+                  const currentX = x.get()
+                  const rawIndex = Math.round(-currentX / dims.itemWidth)
+                  const clamped = Math.max(0, Math.min(extendedCassettes.length - 1, rawIndex))
+                  // Normalise to middle set immediately so we never drift
+                  let targetVi = clamped
+                  while (targetVi < N) targetVi += N
+                  while (targetVi >= 2 * N) targetVi -= N
+                  if (targetVi !== clamped) {
+                    isTeleportingRef.current = true
+                    x.set(-(targetVi * dimsRef.current.itemWidth))
+                  }
+                  setVirtualIndex(targetVi)
+                  virtualIndexRef.current = targetVi
+                  setSelectedIndex(targetVi - N)
+                }}
+              >
+                {extendedCassettes.map((cassette, i) => {
+                  const isMiddle = i >= N && i < 2 * N
+                  const section = i < N ? 'pre' : i < 2 * N ? 'mid' : 'post'
+                  return (
+                    <CassetteItem
+                      key={`${section}-${cassette.id}`}
+                      cassette={cassette}
+                      isSelected={i === virtualIndex}
+                      isInserted={isMiddle && isInserted && currentCassette?.id === cassette.id}
+                      isMiddle={isMiddle}
+                      width={dims.width}
+                    />
+                  )
+                })}
+              </motion.div>
+            </div>
+
+            <div className="carousel-nav">
+              <button className="nav-arrow" onClick={goLeft}>&#8592;</button>
+              <button className="nav-arrow" onClick={goRight}>&#8594;</button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedCassette && !selectedIsInserted && (
+          <motion.button
+            key="insert-btn"
+            className="insert-button insert-button--floating"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => handleInsert(selectedCassette)}
+          >
+            Insert Tape
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 
@@ -104,38 +228,38 @@ interface CassetteItemProps {
   cassette: Cassette
   isSelected: boolean
   isInserted: boolean
-  onInsert: () => void
+  isMiddle: boolean
+  width: number
 }
 
-function CassetteItem({ cassette, isSelected, isInserted, onInsert }: CassetteItemProps) {
+function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width }: CassetteItemProps) {
   return (
-    <motion.div
-      className="cassette-item"
-      animate={{
-        y: isSelected ? -12 : 0,
-        scale: isSelected ? 1.05 : 0.95,
-        opacity: isInserted ? 0 : 1,
-      }}
-      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-    >
-      <div className="cassette-body" style={{ borderColor: cassette.color }}>
-        <div className="cassette-label" style={{ backgroundColor: cassette.color }}>
-          <span className="cassette-genre">{cassette.genre}</span>
-          <span className="cassette-count">{cassette.tracks.length} tracks</span>
-        </div>
-        <div className="cassette-reels">
-          <div className="cassette-reel" />
-          <div className="cassette-tape-window" />
-          <div className="cassette-reel" />
-        </div>
-        <div className="cassette-bottom-strip" />
-      </div>
-
-      {isSelected && !isInserted && (
-        <button className="insert-button" onClick={onInsert}>
-          Insert Tape
-        </button>
-      )}
-    </motion.div>
+    <div className="cassette-item" style={{ width }}>
+      <AnimatePresence>
+        {!isInserted && (
+          <motion.div
+            layoutId={isMiddle ? `cassette-${cassette.id}` : undefined}
+            animate={{
+              y: isSelected ? -12 : 0,
+              scale: isSelected ? 1.05 : 0.95,
+            }}
+            transition={SPRING}
+          >
+            <div className="cassette-body" style={{ borderColor: cassette.color }}>
+              <div className="cassette-label" style={{ backgroundColor: cassette.color }}>
+                <span className="cassette-genre">{cassette.genre}</span>
+                <span className="cassette-count">{cassette.tracks.length} tracks</span>
+              </div>
+              <div className="cassette-reels">
+                <div className="cassette-reel" />
+                <div className="cassette-tape-window" />
+                <div className="cassette-reel" />
+              </div>
+              <div className="cassette-bottom-strip" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   )
 }

@@ -72,7 +72,8 @@ export function useAudioFilter(quality: AudioQuality, isPlaying: boolean) {
 
     // Small delay so MusicKit finishes its own audio setup before we intercept
     const timer = setTimeout(() => {
-      const el = document.querySelector('audio') ?? document.querySelector('video')
+      const allAudio = Array.from(document.querySelectorAll('audio'))
+      const el = allAudio[0] ?? document.querySelector('video') as HTMLMediaElement | null
       if (!(el instanceof HTMLMediaElement)) return
 
       // If element swapped (new track), tear down old chain
