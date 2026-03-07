@@ -2,7 +2,6 @@
 // Stored locally — re-export from Figma MCP if the design changes.
 
 import _imgVector9 from './player-vector9.svg'
-import _imgGlassScreenReflection from './player-glass-screen-reflection.png'
 import _imgBackPanel from './player-back-panel.svg'
 import _imgBackPanel1 from './player-back-panel-1.svg'
 import _imgLines from './player-lines.svg'
@@ -35,7 +34,6 @@ import _imgTapeTypeBg from './player-tape-type-bg.png'
 import _imgTapeTypeRow from './player-tape-type-row.png'
 
 export const imgVector9 = _imgVector9
-export const imgGlassScreenReflection = _imgGlassScreenReflection
 export const imgBackPanel = _imgBackPanel
 export const imgBackPanel1 = _imgBackPanel1
 export const imgLines = _imgLines

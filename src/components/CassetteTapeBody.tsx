@@ -32,7 +32,7 @@ const BODY_LAYERS: [string, number, number, number, number][] = [
   [CA.imgScrew,              566,     363,    22,    22], // BR
   [CA.imgSideABottomRight,   517,     321,    53,    38],
   [CA.imgLogoTopRight,       504,      56,    53,    12],
-  [CA.imgTdkLogo,            144,     262,   109,    22],
+  [CA.imgTdkLogo,            165,     255,   327,    66],
 ]
 
 function f(n: number) { return n.toFixed(4) }
