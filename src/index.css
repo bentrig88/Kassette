@@ -373,15 +373,13 @@ input[type='range'] {
 
 /* Reel rotation is driven by Framer Motion useMotionValue in CassetteTapeBody.tsx */
 
-/* Part 3: Swapable body — all layers stacked in background-image (1 DOM element).
-   background-image/size/position are set via inline style in CassetteTapeBody.tsx
-   using calc(var(--cw) * frac) / calc(var(--ch) * frac) expressions. */
+/* Part 3: Swapable body — stacked <img> elements positioned via inline style.
+   overflow: visible so imgEars and imgSubtractBaseShadow can bleed outside bounds. */
 .ct-swapable {
   left: 0; top: 0;
-  /* imgSubtractBaseShadow bleeds 8px below the 342px body → need ~2.4% extra height.
-     imgEars bleeds 4px past the right edge → need ~0.8% extra width. */
-  width: calc(var(--cw) * 1.008);
-  height: calc(var(--ch) * 1.025);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
 /* Part 4: Window — pure CSS frosted-glass effect

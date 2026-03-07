@@ -215,17 +215,26 @@ npm run build    # production build
 ## Phase 3 — Visual Redesign (In Progress)
 
 ### Asset Pipeline
-All player and cassette images are Figma exports stored **locally** in `src/assets/` and imported via Vite module imports in `playerAssets.ts` and `cassetteAssets.ts`.
+All player and cassette images are Figma exports stored **locally** in `src/assets/` and imported via Vite module imports in `playerAssets.ts` and `cassetteAssets.ts`. They no longer depend on expiring Figma CDN URLs.
 
-**Player assets** (`player-*.png`): 32 files covering the player body, buttons, reels, volume slider, tape type selector, etc.
-**Cassette assets** (`cassette-*.png`): 14 files covering the TDK-style cassette body layers.
+**Player assets** (`player-*.svg/.png`): 32 files — player body, buttons, reels, volume slider, tape type selector, etc.
+**Cassette assets** (`cassette-*.svg/.png`): 14 files — TDK-style cassette body layers.
+
+Most assets are SVG (vector exports from Figma). Five are PNG (rasterized exports).
 
 To re-export after a Figma design change:
-1. Use the Figma MCP `get_design_context` on the updated node to get fresh asset URLs
-2. Download the specific file(s) into `src/assets/` with the same filename
-3. No code changes needed — imports stay the same
+1. Use the Figma MCP `get_design_context` on the updated node to get a fresh asset URL
+2. `curl -o src/assets/<filename> "<url>"` — file command will tell you if it's SVG or PNG
+3. Rename to `.svg` or `.png` accordingly — no code changes needed
 
 Figma file: `8Q9h4JkKgL8ota7JdW7qrX`, main player node: `40:1219`.
+
+### Critical: SVG url(#id) in CSS background-image (Chrome bug)
+SVGs exported from Figma use internal `url(#id)` references for gradients and filters (e.g. `fill="url(#paint0_linear_0_193)"`). When an SVG is used as CSS `background-image: url(file.svg)`, Chrome resolves `url(#id)` against the **page document** instead of the SVG file — all gradients and filters silently fail, rendering the layer transparent.
+
+**Fix**: Use stacked `<img src={url}>` elements instead of CSS `background-image`. Each `<img>` loads the SVG as its own document where `url(#id)` resolves correctly.
+
+This is why `ct-swapable` in `CassetteTapeBody.tsx` renders as a `<div>` containing absolutely-positioned `<img>` elements (one per layer) rather than a single `<div>` with a multi-layer `background-image` inline style. The positioning math is identical — `left/top/width/height` via `calc(var(--cw/ch) * fraction)` — just applied as img styles instead of background-size/position.
 
 **Important:** Some Figma layers carry a 180° flip internally. When exported the flip is baked into the PNG pixels. If a CSS `transform: rotate(180deg)` is also applied in code, the asset double-flips (inner shadows appear on wrong side). Fix: remove the flip from the Figma layer first, re-export, then remove the CSS transform.
 
