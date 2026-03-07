@@ -237,7 +237,7 @@ export function CassettePlayer() {
   // dB frame: y=45, h=303. Gauge is 4px tall. At silence: bottom of frame. At peak: top.
   const avgVU = useMemo(() => bars.reduce((a, b) => a + b, 0) / (bars.length || 1), [bars])
   const scaledVU = Math.min(1, Math.pow(avgVU * 4, 0.5)) * volume
-  const gaugeY = (1 - scaledVU) * 230
+  const gaugeY = isPlaying ? (1 - scaledVU) * 230 : 286
 
   // Volume knob: track y=53, h=303, knob h=44. Top=max vol, bottom=min vol.
   const volKnobY = 53 + (1 - volume) * 280
@@ -408,9 +408,7 @@ export function CassettePlayer() {
             <img src={A.imgReelRight} alt="" className="np-reel-img" />
           </div>
         </motion.div>
-        {(!isInserted || !currentCassette) && (
-          <div className="np-tape-empty">INSERT TAPE</div>
-        )}
+
       </div>
 
       {/* ── Screen ───────────────────────────────────────── */}
