@@ -215,8 +215,16 @@ npm run build    # production build
 ## Phase 3 — Visual Redesign (In Progress)
 
 ### Asset Pipeline
-All player images are Figma exports stored in `src/assets/playerAssets.ts` as URL strings.
-URLs expire after 7 days — re-export via the Figma MCP (`get_design_context` on the node) when they stop loading.
+All player and cassette images are Figma exports stored **locally** in `src/assets/` and imported via Vite module imports in `playerAssets.ts` and `cassetteAssets.ts`.
+
+**Player assets** (`player-*.png`): 32 files covering the player body, buttons, reels, volume slider, tape type selector, etc.
+**Cassette assets** (`cassette-*.png`): 14 files covering the TDK-style cassette body layers.
+
+To re-export after a Figma design change:
+1. Use the Figma MCP `get_design_context` on the updated node to get fresh asset URLs
+2. Download the specific file(s) into `src/assets/` with the same filename
+3. No code changes needed — imports stay the same
+
 Figma file: `8Q9h4JkKgL8ota7JdW7qrX`, main player node: `40:1219`.
 
 **Important:** Some Figma layers carry a 180° flip internally. When exported the flip is baked into the PNG pixels. If a CSS `transform: rotate(180deg)` is also applied in code, the asset double-flips (inner shadows appear on wrong side). Fix: remove the flip from the Figma layer first, re-export, then remove the CSS transform.

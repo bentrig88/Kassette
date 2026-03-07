@@ -1,42 +1,68 @@
 // Figma-exported image assets for the cassette player UI.
-// These URLs expire after 7 days — re-export from Figma if they stop loading.
+// Stored locally — re-export from Figma MCP if the design changes.
 
-export const imgVector9 = "https://www.figma.com/api/mcp/asset/11869cd3-aa2d-4542-b32e-729adeab03dc"
-export const imgGlassScreenReflection = "https://www.figma.com/api/mcp/asset/58604f4c-a94c-43e0-80bb-0ad745d763a2"
-export const imgBackPanel = "https://www.figma.com/api/mcp/asset/daf1389b-d084-4400-89af-581b1a121dea"
-export const imgBackPanel1 = "https://www.figma.com/api/mcp/asset/b0e57466-cfa3-40f1-af4a-2ad040ccc29e"
-export const imgLines = "https://www.figma.com/api/mcp/asset/57da6d67-7a4c-49a2-befd-7e9d004553b1"
-export const imgButtonsGuardElevLeft = "https://www.figma.com/api/mcp/asset/59569105-1f60-4b30-910d-10fdf094cb00"
-export const imgButtonsGuardElevLeft1 = "https://www.figma.com/api/mcp/asset/d87f8f1c-b5d1-4b4a-b964-18acdf80385c"
-export const imgLines1 = "https://www.figma.com/api/mcp/asset/8439b93e-e74f-432b-8c1b-156979a45113"
-export const imgButtonGuard = "https://www.figma.com/api/mcp/asset/15fbd882-4e08-40fa-92a0-e449c95361a3"
-export const imgGroup10 = "https://www.figma.com/api/mcp/asset/4e099dff-e996-4457-a26b-ebc363efa66b"
-export const imgBackTape = "https://www.figma.com/api/mcp/asset/f76fe455-a5b8-41f0-a2bd-a47fa8ba263d"
-// Reel components (left and right reels share the same images)
-export const imgReelOuter = "https://www.figma.com/api/mcp/asset/f49ac7f0-8168-48ac-aebd-6acb212191a9"
-export const imgReelHub = "https://www.figma.com/api/mcp/asset/22d4dada-767a-4e97-8631-d05af1a23803"
-export const imgReelSpokes = "https://www.figma.com/api/mcp/asset/1b96e6c4-0016-4980-b6fd-3628f7654224"
-export const imgReelCenter1 = "https://www.figma.com/api/mcp/asset/93098c65-d5f5-4a65-8d49-0ab752ac8573"
-export const imgReelCenter2 = "https://www.figma.com/api/mcp/asset/14b93b01-a40f-4f57-b5e7-feb2ae7c80fb"
-export const imgReelCenter3 = "https://www.figma.com/api/mcp/asset/9b3069ae-15b8-42aa-b39c-b93e99216045"
-export const imgLine14 = "https://www.figma.com/api/mcp/asset/13b0138a-c5c8-4cfa-a386-347e08140d5c"
-export const imgButtonOffset = "https://www.figma.com/api/mcp/asset/6f4bd6b1-d73a-4b82-a92a-df397f4ab908"
-export const imgButtonGradiant = "https://www.figma.com/api/mcp/asset/2c390e2d-e008-4a5f-ac65-e114ba643603"
-export const imgNextButton = "https://www.figma.com/api/mcp/asset/a951bf36-02ae-4743-ad1e-30e389eb2269"
-export const imgPrevButton = "https://www.figma.com/api/mcp/asset/75fbfc06-cc67-4ca7-bb5e-a9c799e2e593"
-export const imgPauseButton = "https://www.figma.com/api/mcp/asset/c3c644cf-fbf5-412c-b13a-20447087a85d"
-export const imgStopButton = "https://www.figma.com/api/mcp/asset/1a51143e-591d-4903-912d-5f69cd84b355"
-export const imgPlayButton = "https://www.figma.com/api/mcp/asset/180a1044-8846-4c40-b233-550e28671e56"
-export const imgEjectButton = "https://www.figma.com/api/mcp/asset/0898d14b-f07c-4e25-b6ac-e4243ff0f6e7"
-export const imgSpeaker = "https://www.figma.com/api/mcp/asset/23b6143d-54b9-4b21-9f1d-08ced0c42322"
-export const imgLine1 = "https://www.figma.com/api/mcp/asset/4b750c21-434e-43a4-ad21-4a6b1561121e"
-export const imgLine2 = "https://www.figma.com/api/mcp/asset/b95e0467-c4ca-410a-a2a4-a02444cebc0b"
-export const imgVolumeSliderNob = "https://www.figma.com/api/mcp/asset/74a7340b-5780-4850-881b-5941c1755d53"
-export const imgTapeTypeNobSelector = "https://www.figma.com/api/mcp/asset/ee95477d-81f9-4a95-adbf-8099826080cf"
-// Volume slider track background and tick marks
-export const imgVolTrackBg = "https://www.figma.com/api/mcp/asset/c684b20a-8c28-4dc8-86af-81e5c5732bea"
-export const imgVolTick = "https://www.figma.com/api/mcp/asset/e33405ba-dd13-46e2-89e5-8ac79803074a"
-export const imgVolumeTicks = "https://www.figma.com/api/mcp/asset/a660b21e-0782-464f-b5ad-201748615fed"
-// Tape type selector frame background and dots
-export const imgTapeTypeBg = "https://www.figma.com/api/mcp/asset/87ea4de1-999d-45e9-b3f6-72274e7aad6e"
-export const imgTapeTypeRow = "https://www.figma.com/api/mcp/asset/c4a20338-4660-4760-8f67-a23d7c8d2947"
+import _imgVector9 from './player-vector9.png'
+import _imgGlassScreenReflection from './player-glass-screen-reflection.png'
+import _imgBackPanel from './player-back-panel.png'
+import _imgBackPanel1 from './player-back-panel-1.png'
+import _imgLines from './player-lines.png'
+import _imgButtonsGuardElevLeft from './player-buttons-guard-elev-left.png'
+import _imgButtonsGuardElevLeft1 from './player-buttons-guard-elev-left-1.png'
+import _imgLines1 from './player-lines-1.png'
+import _imgButtonGuard from './player-button-guard.png'
+import _imgGroup10 from './player-group10.png'
+import _imgBackTape from './player-back-tape.png'
+import _imgReelLeft from './player-reel-left.png'
+import _imgReelRight from './player-reel-right.png'
+import _imgLine14 from './player-line14.png'
+import _imgButtonOffset from './player-button-offset.png'
+import _imgButtonGradiant from './player-button-gradient.png'
+import _imgNextButton from './player-btn-next.png'
+import _imgPrevButton from './player-btn-prev.png'
+import _imgPauseButton from './player-btn-pause.png'
+import _imgStopButton from './player-btn-stop.png'
+import _imgPlayButton from './player-btn-play.png'
+import _imgEjectButton from './player-btn-eject.png'
+import _imgSpeaker from './player-speaker.png'
+import _imgLine1 from './player-line1.png'
+import _imgLine2 from './player-line2.png'
+import _imgVolumeSliderNob from './player-vol-slider-knob.png'
+import _imgTapeTypeNobSelector from './player-tape-type-knob.png'
+import _imgVolTrackBg from './player-vol-track-bg.png'
+import _imgVolTick from './player-vol-tick.png'
+import _imgVolumeTicks from './player-vol-ticks.png'
+import _imgTapeTypeBg from './player-tape-type-bg.png'
+import _imgTapeTypeRow from './player-tape-type-row.png'
+
+export const imgVector9 = _imgVector9
+export const imgGlassScreenReflection = _imgGlassScreenReflection
+export const imgBackPanel = _imgBackPanel
+export const imgBackPanel1 = _imgBackPanel1
+export const imgLines = _imgLines
+export const imgButtonsGuardElevLeft = _imgButtonsGuardElevLeft
+export const imgButtonsGuardElevLeft1 = _imgButtonsGuardElevLeft1
+export const imgLines1 = _imgLines1
+export const imgButtonGuard = _imgButtonGuard
+export const imgGroup10 = _imgGroup10
+export const imgBackTape = _imgBackTape
+export const imgReelLeft = _imgReelLeft
+export const imgReelRight = _imgReelRight
+export const imgLine14 = _imgLine14
+export const imgButtonOffset = _imgButtonOffset
+export const imgButtonGradiant = _imgButtonGradiant
+export const imgNextButton = _imgNextButton
+export const imgPrevButton = _imgPrevButton
+export const imgPauseButton = _imgPauseButton
+export const imgStopButton = _imgStopButton
+export const imgPlayButton = _imgPlayButton
+export const imgEjectButton = _imgEjectButton
+export const imgSpeaker = _imgSpeaker
+export const imgLine1 = _imgLine1
+export const imgLine2 = _imgLine2
+export const imgVolumeSliderNob = _imgVolumeSliderNob
+export const imgTapeTypeNobSelector = _imgTapeTypeNobSelector
+export const imgVolTrackBg = _imgVolTrackBg
+export const imgVolTick = _imgVolTick
+export const imgVolumeTicks = _imgVolumeTicks
+export const imgTapeTypeBg = _imgTapeTypeBg
+export const imgTapeTypeRow = _imgTapeTypeRow

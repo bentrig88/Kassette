@@ -1,0 +1,29 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 63 83" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Button-offset">
+<g id="Button-offset_2" filter="url(#filter0_n_0_12)">
+<path d="M0.51767 2.41165C0.798124 1.00938 2.02937 0 3.45941 0H59.4262C60.907 0 62.1662 1.08033 62.3914 2.54383L63 6.5V77C63 80.3137 60.3137 83 57 83H6C2.68629 83 0 80.3137 0 77V5L0.51767 2.41165Z" fill="url(#paint0_linear_0_12)"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_n_0_12" x="0" y="0" width="63" height="83" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feTurbulence type="fractalNoise" baseFrequency="3.8461539745330811 3.8461539745330811" stitchTiles="stitch" numOctaves="3" result="noise" seed="3256" />
+<feColorMatrix in="noise" type="luminanceToAlpha" result="alphaNoise" />
+<feComponentTransfer in="alphaNoise" result="coloredNoise1">
+<feFuncA type="discrete" tableValues="0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 "/>
+</feComponentTransfer>
+<feComposite operator="in" in2="shape" in="coloredNoise1" result="noise1Clipped" />
+<feFlood flood-color="rgba(215, 202, 148, 0.25)" result="color1Flood" />
+<feComposite operator="in" in2="noise1Clipped" in="color1Flood" result="color1" />
+<feMerge result="effect1_noise_0_12">
+<feMergeNode in="shape" />
+<feMergeNode in="color1" />
+</feMerge>
+</filter>
+<linearGradient id="paint0_linear_0_12" x1="34.2464" y1="7.60202e-08" x2="34.2464" y2="80" gradientUnits="userSpaceOnUse">
+<stop stop-color="#756D49" style="stop-color:#756D49;stop-color:color(display-p3 0.4570 0.4284 0.2852);stop-opacity:1;"/>
+<stop offset="1" stop-color="#F5F1DB" style="stop-color:#F5F1DB;stop-color:color(display-p3 0.9624 0.9451 0.8583);stop-opacity:1;"/>
+</linearGradient>
+</defs>
+</svg>

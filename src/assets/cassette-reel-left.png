@@ -1,0 +1,50 @@
+<svg preserveAspectRatio="none" width="100%" height="100%" overflow="visible" style="display: block;" viewBox="0 0 244 244" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="left-reel-tape">
+<mask id="mask0_0_4" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="244" height="244">
+<circle id="mask-left" cx="122" cy="122" r="122" fill="var(--fill-0, #5C86F1)" style="fill:#5C86F1;fill:color(display-p3 0.3626 0.5259 0.9458);fill-opacity:1;"/>
+</mask>
+<g mask="url(#mask0_0_4)">
+<g id="tape">
+<path d="M244 122C244 189.379 189.379 244 122 244C54.6213 244 0 189.379 0 122C0 54.6213 54.6213 0 122 0C189.379 0 244 54.6213 244 122ZM60.024 122C60.024 156.228 87.7716 183.976 122 183.976C156.228 183.976 183.976 156.228 183.976 122C183.976 87.7716 156.228 60.024 122 60.024C87.7716 60.024 60.024 87.7716 60.024 122Z" fill="var(--fill-0, #281A05)" style="fill:#281A05;fill:color(display-p3 0.1583 0.1027 0.0191);fill-opacity:1;"/>
+<path d="M244 122C244 189.379 189.379 244 122 244C54.6213 244 0 189.379 0 122C0 54.6213 54.6213 0 122 0C189.379 0 244 54.6213 244 122ZM60.024 122C60.024 156.228 87.7716 183.976 122 183.976C156.228 183.976 183.976 156.228 183.976 122C183.976 87.7716 156.228 60.024 122 60.024C87.7716 60.024 60.024 87.7716 60.024 122Z" fill="url(#paint0_radial_0_4)" fill-opacity="0.7"/>
+</g>
+<g id="left-reel">
+<g id="reel" filter="url(#filter0_d_0_4)">
+<path d="M122 60C155.386 60 182.605 86.3878 183.945 119.444C183.714 113.834 182.722 108.247 180.966 102.841L175.069 104.757C178.711 115.964 178.711 128.036 175.069 139.243L180.966 141.159C182.724 135.748 183.716 130.155 183.946 124.539C182.614 157.603 155.391 184 122 184C87.7583 184 60 156.242 60 122C60 87.7583 87.7583 60 122 60ZM122 89C117.469 89 113.151 89.914 109.221 91.5664L114.558 100.91L107.61 104.877L102.277 95.5391C95.2914 100.754 90.4399 108.672 89.2715 117.742L100.031 117.826L99.9697 125.825L89.2119 125.742C90.2529 134.965 95.0942 143.035 102.134 148.351L107.539 139.048L114.457 143.065L109.056 152.362C113.03 154.059 117.405 155 122 155C126.597 155 130.974 154.058 134.95 152.359L129.55 143.062L136.468 139.044L141.871 148.346C148.842 143.08 153.658 135.113 154.759 126H144L144 118H154.759C153.671 108.994 148.954 101.107 142.114 95.8398L136.647 105.096L129.759 101.026L135.23 91.7617C131.18 89.9869 126.705 89 122 89ZM184 122C184 122.364 183.996 122.728 183.989 123.091C184.002 122.363 184.002 121.635 183.989 120.907C183.996 121.271 184 121.635 184 122Z" fill="var(--fill-0, white)" style="fill:white;fill-opacity:1;"/>
+</g>
+<path id="red-clips" d="M180.965 102.841C185.011 115.293 185.011 128.707 180.965 141.159L175.069 139.243C178.71 128.036 178.71 115.964 175.069 104.757L180.965 102.841ZM177.426 106.595C180.129 116.682 180.13 127.302 177.43 137.39L179.826 138.031C182.638 127.524 182.637 116.46 179.822 105.953L177.426 106.595Z" fill="var(--fill-0, #DD2828)" style="fill:#DD2828;fill:color(display-p3 0.8667 0.1553 0.1553);fill-opacity:1;"/>
+<g id="paint">
+<circle id="Ellipse 1" opacity="0.5" cx="204" cy="131" r="3" fill="var(--fill-0, #3E3E3E)" style="fill:#3E3E3E;fill:color(display-p3 0.2431 0.2431 0.2431);fill-opacity:1;"/>
+<ellipse id="Ellipse 2" opacity="0.5" cx="217" cy="143.5" rx="1" ry="4.5" transform="rotate(17.7119 217 143.5)" fill="var(--fill-0, #3E3E3E)" style="fill:#3E3E3E;fill:color(display-p3 0.2431 0.2431 0.2431);fill-opacity:1;"/>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_0_4" x="60" y="60" width="124" height="128" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.313984 0 0 0 0 0.313984 0 0 0 0 0.313984 0 0 0 1 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_4"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_4" result="shape"/>
+</filter>
+<radialGradient id="paint0_radial_0_4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(122 122) rotate(90) scale(122)">
+<stop stop-color="#232323" style="stop-color:#232323;stop-color:color(display-p3 0.1373 0.1373 0.1373);stop-opacity:1;"/>
+<stop offset="0.541667" stop-color="#0E0E0E" style="stop-color:#0E0E0E;stop-color:color(display-p3 0.0542 0.0542 0.0542);stop-opacity:1;"/>
+<stop offset="0.567708" stop-color="#0A0A0A" style="stop-color:#0A0A0A;stop-color:color(display-p3 0.0375 0.0375 0.0375);stop-opacity:1;"/>
+<stop offset="0.604167" stop-color="#111111" style="stop-color:#111111;stop-color:color(display-p3 0.0667 0.0667 0.0667);stop-opacity:1;"/>
+<stop offset="0.630208" stop-color="#030303" style="stop-color:#030303;stop-color:color(display-p3 0.0125 0.0125 0.0125);stop-opacity:1;"/>
+<stop offset="0.692708" stop-color="#0A0A0A" style="stop-color:#0A0A0A;stop-color:color(display-p3 0.0375 0.0375 0.0375);stop-opacity:1;"/>
+<stop offset="0.739583" stop-color="#0C0C0C" style="stop-color:#0C0C0C;stop-color:color(display-p3 0.0458 0.0458 0.0458);stop-opacity:1;"/>
+<stop offset="0.776042" stop-color="#090909" style="stop-color:#090909;stop-color:color(display-p3 0.0333 0.0333 0.0333);stop-opacity:1;"/>
+<stop offset="0.802083" stop-color="#070707" style="stop-color:#070707;stop-color:color(display-p3 0.0292 0.0292 0.0292);stop-opacity:1;"/>
+<stop offset="0.838484" stop-color="#050505" style="stop-color:#050505;stop-color:color(display-p3 0.0208 0.0208 0.0208);stop-opacity:1;"/>
+<stop offset="0.894232" stop-color="#0D0D0D" style="stop-color:#0D0D0D;stop-color:color(display-p3 0.0500 0.0500 0.0500);stop-opacity:1;"/>
+<stop offset="0.921875" stop-color="#0C0C0C" style="stop-color:#0C0C0C;stop-color:color(display-p3 0.0458 0.0458 0.0458);stop-opacity:1;"/>
+<stop offset="0.96875" stop-color="#0C0C0C" style="stop-color:#0C0C0C;stop-color:color(display-p3 0.0458 0.0458 0.0458);stop-opacity:1;"/>
+<stop offset="1" stop-color="#0B0B0B" style="stop-color:#0B0B0B;stop-color:color(display-p3 0.0417 0.0417 0.0417);stop-opacity:1;"/>
+</radialGradient>
+</defs>
+</svg>
