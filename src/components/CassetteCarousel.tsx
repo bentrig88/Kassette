@@ -134,7 +134,7 @@ export function CassetteCarousel() {
     const el = document.querySelector('[data-insert-target]') as HTMLElement | null
     if (el) {
       const rect = el.getBoundingClientRect()
-      liftYRef.current = 110 - rect.top
+      liftYRef.current = -70 - rect.top
     }
     setIsInserting(true)
     // Start loading queue in parallel with the carousel lift animation
@@ -142,7 +142,7 @@ export function CassetteCarousel() {
     // Wait for the lift animation (400ms) to finish, plus queue loading
     const [shuffled] = await Promise.all([
       queuePromise,
-      new Promise<void>(resolve => setTimeout(resolve, 500)),
+      new Promise<void>(resolve => setTimeout(resolve, 400)),
     ])
     // Measure the motion.div's ACTUAL rendered position after the lift animation.
     // data-flip-source is on the motion.div so getBoundingClientRect() includes
@@ -332,7 +332,7 @@ function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width, isIns
             }}
             exit={{ opacity: 0, transition: { duration: 0.3 } }}
             transition={isExiting || (isInserting && isSelected)
-              ? { duration: 0.4, ease: 'easeInOut' }
+              ? { duration: 0.4, ease: isInserting && isSelected ? [0.895, 0.03, 0.685, 0.22] : 'easeInOut' }
               : SPRING
             }
           >

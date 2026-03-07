@@ -205,8 +205,8 @@ export function CassettePlayer() {
     const targetCX = targetRect.left + targetRect.width / 2
     const targetCY = targetRect.top + targetRect.height / 2
     bayX.set(sourceCX - targetCX)
-    bayY.set(sourceCY - targetCY + 97)
-    bayScale.set(1.1)
+    bayY.set(sourceCY - targetCY - 5)
+    bayScale.set(1.12)
     animate(bayX, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
     animate(bayY, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
     animate(bayScale, 1, { duration: 0.3, ease: [0, 0, 0.58, 1] })
@@ -258,6 +258,23 @@ export function CassettePlayer() {
   // Shared rotation for both np-reels — same direction, same speed, perfectly in sync.
   // Imperative loop: stops instantly at the current angle (no snap-back).
   const reelRotate = useMotionValue(0)
+
+  // Protection door: open when no tape, closes once tape is seated
+  const doorAngle = useMotionValue(-45) // starts open
+  useEffect(() => {
+    if (!isInserted || !currentCassette) {
+      // Eject or no tape: open the door
+      animate(doorAngle, -45, { duration: 0.35, ease: [0, 0, 0.58, 1] })
+      return
+    }
+    // Close after FLIP ends (0.3s) + enough time for track info to appear on screen
+    const t = setTimeout(() => {
+      animate(doorAngle, 0, { duration: 0.6, ease: [0, 0, 0.3, 1] })
+    }, 750)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCassette?.id, isInserted])
+
   useEffect(() => {
     if (reelSpeed === 0) return
     const direction = reelSpeed > 0 ? 1 : -1
@@ -408,6 +425,11 @@ export function CassettePlayer() {
             <img src={A.imgReelRight} alt="" className="np-reel-img" />
           </div>
         </motion.div>
+
+        {/* Protection door — 3D flap hinged at bottom edge */}
+        <div className="np-bay-door-wrap">
+          <motion.div className="np-bay-door" style={{ rotateX: doorAngle }} />
+        </div>
 
       </div>
 

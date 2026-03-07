@@ -1343,6 +1343,22 @@ input[type='range'] {
   inset: 0;
   border-radius: 5px;
 }
+.np-bay-door-wrap {
+  position: absolute;
+  inset: 0;
+  perspective: 700px;
+  pointer-events: none;
+  z-index: 10;
+}
+.np-bay-door {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom center;
+  background: rgba(180, 30, 30, 0.5);
+  border: 2px solid rgba(220, 50, 50, 0.7);
+  border-radius: 12px;
+  backface-visibility: hidden;
+}
 .np-back-tape {
   position: absolute;
   left: 50%; top: 50%;
@@ -1370,6 +1386,11 @@ input[type='range'] {
      The parent .np-player-wrapper already applies scale(--player-scale),
      so no further multiplication needed here. */
   --ch: 220px;
+  animation: bay-shadow-fade 0.3s cubic-bezier(0, 0, 0.58, 1) forwards;
+}
+@keyframes bay-shadow-fade {
+  from { filter: drop-shadow(0 45px 60px rgba(0,0,0,0.55)); }
+  to   { filter: drop-shadow(0 0px 0px rgba(0,0,0,0)); }
 }
 
 /* Reels */
