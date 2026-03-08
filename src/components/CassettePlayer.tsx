@@ -431,8 +431,13 @@ export function CassettePlayer() {
 
         {/* Protection door — 3D flap hinged at bottom edge */}
         <div className="np-bay-door-wrap">
-          <motion.div className="np-bay-door" style={{ rotateX: doorAngle }} />
+          <motion.div className="np-bay-door" style={{ rotateX: doorAngle }}>
+            <img src={A.imgDoor} alt="" className="np-bay-door-img" />
+          </motion.div>
         </div>
+
+        {/* Hinges — static, sit at the bottom edge of the bay between door and screen */}
+        <img src={A.imgDoorHinges} alt="" className="np-bay-hinges" />
 
       </div>
 

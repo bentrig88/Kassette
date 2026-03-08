@@ -32,6 +32,8 @@ import _imgVolTick from './player-vol-tick.png'
 import _imgVolumeTicks from './player-vol-ticks.svg'
 import _imgTapeTypeBg from './player-tape-type-bg.png'
 import _imgTapeTypeRow from './player-tape-type-row.png'
+import _imgDoor from './player-door.svg'
+import _imgDoorHinges from './player-door-hinges.svg'
 
 export const imgVector9 = _imgVector9
 export const imgBackPanel = _imgBackPanel
@@ -64,3 +66,5 @@ export const imgVolTick = _imgVolTick
 export const imgVolumeTicks = _imgVolumeTicks
 export const imgTapeTypeBg = _imgTapeTypeBg
 export const imgTapeTypeRow = _imgTapeTypeRow
+export const imgDoor = _imgDoor
+export const imgDoorHinges = _imgDoorHinges
