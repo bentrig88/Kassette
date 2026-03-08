@@ -254,8 +254,8 @@ export function CassetteCarousel() {
               animate={{ opacity: isInserting ? 0 : 1 }}
               transition={{ duration: 0.3 }}
             >
-              <button className="nav-arrow" onClick={goLeft}>&#8592;</button>
-              <button className="nav-arrow" onClick={goRight}>&#8594;</button>
+              <button className="nav-arrow" onClick={goLeft}>&#8249;</button>
+              <button className="nav-arrow" onClick={goRight}>&#8250;</button>
             </motion.div>
           </motion.div>
         )}
