@@ -1,7 +1,7 @@
-import bgGeneric from '../assets/background-generic.jpg'
-import obj1 from '../assets/object-generic-1.png'
-import obj2 from '../assets/object-generic-2.png'
-import obj3 from '../assets/object-generic-3.png'
+import bgGeneric from '../assets/background/background-generic.jpg'
+import obj1 from '../assets/background/object-generic-1.png'
+import obj2 from '../assets/background/object-generic-2.png'
+import obj3 from '../assets/background/object-generic-3.png'
 
 export function SceneBackground() {
   return (

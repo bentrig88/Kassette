@@ -368,8 +368,8 @@ input[type='range'] {
 
 /* Part 1 & 2: Reels — single image assets
    Body-relative coords: left=(canvas_x - 47)/550, top=(canvas_y - 52)/342 */
-.ct-reel-left  { left: 5.82%;  top: 11.11%; width: 44.36%; height: 71.35%; transform-origin: center; }
-.ct-reel-right { left: 60.73%; top: 28.65%; width: 22.55%; height: 36.26%; transform-origin: center; }
+.ct-reel-left  { left: 8%;  top: 13%; width: 40%; height: 67%; transform-origin: center; }
+.ct-reel-right { left: 62%; top: 30%; width: 20%; height: 33%; transform-origin: center; }
 
 /* Reel rotation is driven by Framer Motion useMotionValue in CassetteTapeBody.tsx */
 
@@ -1766,11 +1766,12 @@ input[type='range'] {
 
 .np-tapetype-knob-wrap {
   position: absolute;
-  top: 299px;
-  width: 44px; height: 42px;
+  top: 289px;
+  width: 59px;
+  height: 56px;
   z-index: 2;
   transition: left 0.2s ease;
-  transform: translateX(-22px);
+  transform: translateX(-30px);
 }
 .np-tapetype-options {
   z-index: 3;

@@ -37,17 +37,38 @@ src/
     useRewindSFX.ts     SFX chain for fast-backward (start → loop → end)
     useButtonSFX.ts     One-shot SFX for transport button presses (reg + eject variants)
     useMotorSFX.ts      Looping motor SFX that runs while playbackState is playing or loading
+    useDoorSFX.ts       One-shot SFX for door opening and tape inserting
   components/
     AuthScreen.tsx          Apple Music connect UI
     CassetteCarousel.tsx    Draggable genre cassette carousel
     CassettePlayer.tsx      Main player: VU meter, tape bay, track display, controls
     PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
   assets/
-    SFX-rewinding-start.aac
-    SFX-rewinding-loop-2.aac
-    SFX-rewinding-end.aac
-    SFX-kassette-button-reg-pressed.aac
-    SFX-kassette-button-eject-pressed.aac
+    tapes/
+      cassette-body-flat.png        Flattened PNG composite of all static cassette body layers (@2x)
+      cassette2-body-flat.png       … cassette style variants (2–6)
+      cassette3-body-flat.png
+      cassette4-body-flat.png
+      cassette5-body-flat.png
+      cassette6-body-flat.png
+      cassette-reel-left.svg
+      cassette-reel-right.svg
+      cassetteAssets.ts             Imports + genreBodyMap (genre → body PNG)
+    player/
+      player-*.svg / player-*.png   32 player UI assets
+      playerAssets.ts
+    background/
+      background-generic.jpg
+      object-generic-1/2/3.png
+    sfx/
+      SFX-rewinding-start.aac
+      SFX-rewinding-loop-2.aac
+      SFX-rewinding-end.aac
+      SFX-kassette-button-reg-pressed.aac
+      SFX-kassette-button-eject-pressed.aac
+      SFX-kassette-player-motor-loop.aac
+      SFX-kassette-tape-door-openning.aac
+      SFX-kassette-tape-inserting.aac
     SFX-kassette-player-motor-loop.aac
   App.tsx     Auth gate, library loading, layout orchestration
   index.css   All styles (CSS custom properties, dark hardware theme)
@@ -312,10 +333,10 @@ CSS `animation: ct-spin-cw` was replaced with a `requestAnimationFrame` loop in 
 A full-screen background layer rendered behind all UI, with per-cassette/genre background image and decorative PNG objects positioned around the player.
 
 ### Files
-- `src/assets/background-generic.jpg` — generic background (1376×1046)
-- `src/assets/object-generic-1.png` — decorative object 1 (880×1204)
-- `src/assets/object-generic-2.png` — decorative object 2 (689×989)
-- `src/assets/object-generic-3.png` — decorative object 3 (482×1048)
+- `src/assets/background/background-generic.jpg` — generic background (1376×1046)
+- `src/assets/background/object-generic-1.png` — decorative object 1 (880×1204)
+- `src/assets/background/object-generic-2.png` — decorative object 2 (689×989)
+- `src/assets/background/object-generic-3.png` — decorative object 3 (482×1048)
 - `src/components/SceneBackground.tsx` — renders the background + 3 objects
 
 ### CSS structure
@@ -337,6 +358,35 @@ left: calc(60% + var(--player-scale, 1) * 410px);
 
 ### App header
 Updated to `background: rgba(0,0,0,0.45)` with `backdrop-filter: blur(8px)` so the background image shows through.
+
+---
+
+## Cassette Body System
+
+### Flattened PNG approach
+The cassette body (`ct-swapable`) is rendered as a single pre-composited PNG instead of 15 stacked SVG `<img>` elements. This reduces DOM nodes, eliminates per-cassette layer compositing overhead, and fixes the Chrome `url(#id)` gradient resolution bug.
+
+To regenerate the flat PNG after a Figma design change:
+```bash
+node scripts/flatten-cassette-body.mjs
+```
+Script reads SVGs from `src/assets/tapes/`, composites them at 2× (1100×684px) using `sips`, and writes `cassette-body-flat.png`.
+
+### Genre → style mapping
+`src/assets/tapes/cassetteAssets.ts` is the single source of truth for which body PNG each genre uses:
+```ts
+export const genreBodyMap: Record<string, string> = {
+  'Rock':       cassette1,
+  'Hip-Hop':    cassette2,
+  ...
+}
+```
+**Only edit this file** to reassign styles. Currently 6 variants for 8 genres — 2 genres share a style until new variants are created.
+
+### Door SFX (`useDoorSFX`)
+Two one-shot sounds wired into the door animation `useEffect` in `CassettePlayer`:
+- `SFX-kassette-tape-door-openning.aac` — fires immediately when `isInserted` becomes false (eject)
+- `SFX-kassette-tape-inserting.aac` — fires after 300ms when `isInserted` becomes true (aligned with FLIP end + door close)
 
 ---
 

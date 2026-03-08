@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import motorLoop from '../assets/SFX-kassette-player-motor-loop.aac'
+import motorLoop from '../assets/sfx/SFX-kassette-player-motor-loop.aac'
 
 export function useMotorSFX(isPlaying: boolean) {
   const audioRef = useRef<HTMLAudioElement | null>(null)

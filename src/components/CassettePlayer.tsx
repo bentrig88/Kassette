@@ -7,10 +7,11 @@ import { useVUMeter } from '../hooks/useVUMeter'
 import { useAudioFilter } from '../hooks/useAudioFilter'
 import { useRewindSFX } from '../hooks/useRewindSFX'
 import { useButtonSFX } from '../hooks/useButtonSFX'
+import { useDoorSFX } from '../hooks/useDoorSFX'
 import { useMotorSFX } from '../hooks/useMotorSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
 import type { AudioQuality } from '../types/music'
-import * as A from '../assets/playerAssets'
+import * as A from '../assets/player/playerAssets'
 import { CassetteTapeBody } from './CassetteTapeBody'
 
 // dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
@@ -67,6 +68,7 @@ export function CassettePlayer() {
   useAudioFilter(quality, isPlaying)
   const rewindSFX = useRewindSFX()
   const { playReg, playEject } = useButtonSFX()
+  const { playDoorOpen, playTapeInsert } = useDoorSFX()
 
   const queuedTracksRef = useRef(queuedTracks)
   queuedTracksRef.current = queuedTracks
@@ -277,11 +279,13 @@ export function CassettePlayer() {
   useEffect(() => {
     if (!isInserted || !currentCassette) {
       // Eject or no tape: open the door
+      playDoorOpen()
       animate(doorAngle, -45, { duration: 0.35, ease: [0, 0, 0.58, 1] })
       return
     }
-    // Close as soon as FLIP ends (0.3s)
+    // Close as soon as FLIP ends (0.3s) and play insert+close SFX
     const t = setTimeout(() => {
+      playTapeInsert()
       animate(doorAngle, 0, { duration: 0.35, ease: [0, 0, 0.3, 1] })
     }, 300)
     return () => clearTimeout(t)

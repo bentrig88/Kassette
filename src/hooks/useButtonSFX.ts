@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import sfxReg from '../assets/SFX-kassette-button-reg-pressed.aac'
-import sfxEject from '../assets/SFX-kassette-button-eject-pressed.aac'
+import sfxReg from '../assets/sfx/SFX-kassette-button-reg-pressed.aac'
+import sfxEject from '../assets/sfx/SFX-kassette-button-eject-pressed.aac'
 
 export function useButtonSFX() {
   const regRef = useRef<HTMLAudioElement | null>(null)

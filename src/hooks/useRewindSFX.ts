@@ -1,7 +1,7 @@
 import { useRef } from 'react'
-import rewindStart from '../assets/SFX-rewinding-start.aac'
-import rewindLoop from '../assets/SFX-rewinding-loop-2.aac'
-import rewindEnd from '../assets/SFX-rewinding-end.aac'
+import rewindStart from '../assets/sfx/SFX-rewinding-start.aac'
+import rewindLoop from '../assets/sfx/SFX-rewinding-loop-2.aac'
+import rewindEnd from '../assets/sfx/SFX-rewinding-end.aac'
 
 export function useRewindSFX() {
   const startRef = useRef<HTMLAudioElement | null>(null)
