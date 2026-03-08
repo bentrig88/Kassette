@@ -390,6 +390,30 @@ Two one-shot sounds wired into the door animation `useEffect` in `CassettePlayer
 
 ---
 
+## Playlist Filters UI (Phase 3)
+
+Redesigned `PlaylistController` to match the Figma design (`node 63:677`).
+
+### Layout & container
+`.pf-container`: `backdrop-filter: blur(20px)`, `background: rgba(255,255,255,0.1)`, `border-radius: 36px`, `box-shadow: 0 12px 12px rgba(0,0,0,0.25)`, `padding: 20px 24px`.
+Header row: "PLAYLIST FILTERS" left + "N upcoming tracks analyzed" right — both Kode Mono Bold 20px / 10px, white.
+
+### Custom slider
+Each filter uses `.pf-slider-track` (glass pill: `rgba(255,255,255,0.17)` bg, `1px solid rgba(255,255,255,0.2)` border, `border-radius: 28px`, `padding: 4px`) containing a native `<input type="range">` styled with `appearance: none`.
+- Fill: `linear-gradient(to right, #f43c4e var(--pf-fill), rgba(255,255,255,0.12) var(--pf-fill))` — `--pf-fill` is set as an inline CSS variable from `value%`.
+- Thumb: 20px flat `#f43c4e` circle, `box-shadow: 0 0 0 1px rgba(255,255,255,0.2)`. Both `::-webkit-slider-thumb` and `::-moz-range-thumb` defined.
+- Filter label: Montserrat Black 20px. End labels (Slow/Fast etc.): Montserrat Regular 14px.
+
+### Fonts added
+`Montserrat` (weights 400 + 900) added to the Google Fonts import in `index.html`.
+
+### Nav bar
+`.app-header` updated: background matches `.pf-container` (`rgba(255,255,255,0.1)` + `blur(20px)`), border-bottom removed, `box-shadow: 0 4px 12px rgba(0,0,0,0.25)` added.
+`.app-logo`: Kode Mono Bold 20px, white, `text-transform: uppercase`.
+`.signout-btn`: Montserrat Medium (500), white text, `1px solid #fff` border.
+
+---
+
 ## Phases
 - **Phase 1** ✅ — Auth, genre cassettes, player controls, queue, VU meter, tape filter, SFX
 - **Phase 2** ✅ — Preview-based audio analysis, BPM/energy/mood sliders, background analysis, smart queue sorting

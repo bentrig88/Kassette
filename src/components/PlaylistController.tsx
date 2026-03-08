@@ -12,19 +12,22 @@ interface SliderProps {
 
 function Slider({ label, leftLabel, rightLabel, value, onChange }: SliderProps) {
   return (
-    <div className="playlist-slider-group">
-      <div className="playlist-slider-label">{label}</div>
-      <div className="playlist-slider-row">
-        <span className="playlist-slider-end">{leftLabel}</span>
+    <div className="pf-filter">
+      <div className="pf-filter-label">{label}</div>
+      <div className="pf-slider-track">
         <input
           type="range"
-          className="playlist-slider"
+          className="pf-slider"
           min={0}
           max={100}
           value={value}
+          style={{ '--pf-fill': `${value}%` } as React.CSSProperties}
           onChange={(e) => onChange(Number(e.target.value))}
         />
-        <span className="playlist-slider-end">{rightLabel}</span>
+      </div>
+      <div className="pf-labels">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
       </div>
     </div>
   )
@@ -38,7 +41,6 @@ export function PlaylistController() {
   const setEnergyFilter = usePlayerStore((s) => s.setEnergyFilter)
   const setMoodFilter = usePlayerStore((s) => s.setMoodFilter)
   const featuresMap = usePlayerStore((s) => s.featuresMap)
-  const analyzedCount = usePlayerStore((s) => s.analyzedCount)
   const queuedTracks = usePlayerStore((s) => s.queuedTracks)
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
@@ -51,13 +53,10 @@ export function PlaylistController() {
       const tracks = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
       if (tracks.length === 0) return
 
-      // Only re-sort tracks AFTER the current one — current track is unaffected,
-      // so "next" immediately reflects the new filter without jumping around.
       const played = tracks.slice(0, currentTrackIndex + 1)
       const upcoming = tracks.slice(currentTrackIndex + 1)
       const sortedUpcoming = sortTracksByFilters(upcoming, featuresMap, tempo, energy, mood)
       setQueuedTracks([...played, ...sortedUpcoming])
-      // currentTrackIndex stays the same — no need to update it
     },
     [isInserted, queuedTracks, currentCassette, currentTrackIndex, featuresMap, setQueuedTracks]
   )
@@ -84,20 +83,20 @@ export function PlaylistController() {
   const disabled = !isInserted || !enoughData
 
   return (
-    <div className="playlist-controller">
-      <div className="playlist-controller-title">Playlist Filters</div>
-      <div className={`playlist-sliders ${disabled ? 'playlist-sliders--disabled' : ''}`}>
+    <div className="pf-container">
+      <div className="pf-header">
+        <span className="pf-title">PLAYLIST FILTERS</span>
+        <span className="pf-analyzed">
+          {isInserted && (!enoughData
+            ? `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`
+            : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
+        </span>
+      </div>
+      <div className={`pf-sliders${disabled ? ' pf-sliders--disabled' : ''}`}>
         <Slider label="Pace" leftLabel="Slow" rightLabel="Fast" value={tempoFilter} onChange={disabled ? () => {} : handleTempo} />
         <Slider label="Energy" leftLabel="Low" rightLabel="High" value={energyFilter} onChange={disabled ? () => {} : handleEnergy} />
         <Slider label="Mood" leftLabel="Sad" rightLabel="Happy" value={moodFilter} onChange={disabled ? () => {} : handleMood} />
       </div>
-      {isInserted && (
-        <div className="playlist-controller-note">
-          {!enoughData
-            ? `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`
-            : `${analyzedUpcoming} upcoming tracks analyzed`}
-        </div>
-      )}
     </div>
   )
 }
