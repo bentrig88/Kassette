@@ -187,6 +187,7 @@ export function CassettePlayer() {
   const bayX = useMotionValue(0)
   const bayY = useMotionValue(0)
   const bayScale = useMotionValue(1)
+  const bayRotateX = useMotionValue(0)
 
   // FLIP: when the bay cassette mounts, set x/y/scale to the carousel position then
   // animate to 0/0/1. Using Framer Motion motion values avoids the GPU compositing
@@ -207,9 +208,11 @@ export function CassettePlayer() {
     bayX.set(sourceCX - targetCX)
     bayY.set(sourceCY - targetCY - 5)
     bayScale.set(1.12)
+    bayRotateX.set(15)
     animate(bayX, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
     animate(bayY, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
     animate(bayScale, 1, { duration: 0.3, ease: [0, 0, 0.58, 1] })
+    animate(bayRotateX, 0, { duration: 0.3, ease: [0, 0, 0.58, 1] })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCassette?.id, isInserted])
 
@@ -267,10 +270,10 @@ export function CassettePlayer() {
       animate(doorAngle, -45, { duration: 0.35, ease: [0, 0, 0.58, 1] })
       return
     }
-    // Close after FLIP ends (0.3s) + enough time for track info to appear on screen
+    // Close as soon as FLIP ends (0.3s)
     const t = setTimeout(() => {
-      animate(doorAngle, 0, { duration: 0.6, ease: [0, 0, 0.3, 1] })
-    }, 750)
+      animate(doorAngle, 0, { duration: 0.35, ease: [0, 0, 0.3, 1] })
+    }, 300)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCassette?.id, isInserted])
@@ -406,7 +409,7 @@ export function CassettePlayer() {
 
         {/* In-bay cassette — FLIP animates from carousel position via Framer Motion values */}
         {isInserted && currentCassette && (
-          <motion.div ref={bayRef} className="np-cassette-in-bay" style={{ x: bayX, y: bayY, scale: bayScale }}>
+          <motion.div ref={bayRef} className="np-cassette-in-bay" style={{ x: bayX, y: bayY, scale: bayScale, rotateX: bayRotateX, transformPerspective: 800 }}>
             <div className="cassette-body cassette-body--new">
               <CassetteTapeBody cassette={currentCassette} reelSpeed={reelSpeed} />
             </div>

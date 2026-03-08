@@ -329,7 +329,9 @@ function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width, isIns
                 : (isSelected ? -12 : 0),
               scale: isExiting ? 0.7 : (isSelected ? 1.05 : 0.95),
               opacity: isExiting ? 0 : 1,
+              rotateX: isInserting && isSelected ? 15 : 0,
             }}
+            style={{ transformPerspective: 800 }}
             exit={{ opacity: 0, transition: { duration: 0.3 } }}
             transition={isExiting || (isInserting && isSelected)
               ? { duration: 0.4, ease: isInserting && isSelected ? [0.895, 0.03, 0.685, 0.22] : 'easeInOut' }
