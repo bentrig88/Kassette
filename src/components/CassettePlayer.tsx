@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
-import { motion, useMotionValue, animate } from 'framer-motion'
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
 import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
@@ -264,6 +264,16 @@ export function CassettePlayer() {
 
   // Protection door: open when no tape, closes once tape is seated
   const doorAngle = useMotionValue(-45) // starts open
+  const doorShadowOpacity = useTransform(doorAngle, [-45, 0], [1, 0])
+  const doorShadowScaleY = useTransform(doorAngle, [-45, 0], [1, 1.6])
+  const doorShadowSkewX = useTransform(doorAngle, [-45, 0], [20, -5])
+  const doorScaleY = useTransform(doorAngle, [-45, 0], [0.65, 1])
+  const doorOverlayOpacity = useTransform(doorAngle, [-45, 0], [0.45, 0])
+  const hingesBrightness = useTransform(doorAngle, [-45, 0], ['brightness(0.5)', 'brightness(1)'])
+  const doorEdgeX = useTransform(doorAngle, [-45, 0], [0, 68])
+  const doorEdgeY = useTransform(doorAngle, [-45, 0], [0, -111])
+  const doorEdgeWidth = useTransform(doorAngle, [-45, 0], ['133%', '100%'])
+  const doorEdgeOpacity = useTransform(doorAngle, [-45, 0], [1, 0])
   useEffect(() => {
     if (!isInserted || !currentCassette) {
       // Eject or no tape: open the door
@@ -429,15 +439,27 @@ export function CassettePlayer() {
           </div>
         </motion.div>
 
+        {/* Door shadow — cast on the panel below the bay when door is open */}
+        <motion.div
+          className="np-bay-door-shadow"
+          style={{ opacity: doorShadowOpacity, scaleY: doorShadowScaleY, skewX: doorShadowSkewX }}
+        />
+
         {/* Protection door — 3D flap hinged at bottom edge */}
         <div className="np-bay-door-wrap">
-          <motion.div className="np-bay-door" style={{ rotateX: doorAngle }}>
+          {/* Door thickness edge — thin strip visible at top when door is open */}
+          <motion.div
+            className="np-bay-door-edge"
+            style={{ x: doorEdgeX, y: doorEdgeY, width: doorEdgeWidth, opacity: doorEdgeOpacity }}
+          />
+          <motion.div className="np-bay-door" style={{ rotateX: doorAngle, scaleY: doorScaleY }}>
             <img src={A.imgDoor} alt="" className="np-bay-door-img" />
+            <motion.div className="np-bay-door-overlay" style={{ opacity: doorOverlayOpacity }} />
           </motion.div>
         </div>
 
-        {/* Hinges — static, sit at the bottom edge of the bay between door and screen */}
-        <img src={A.imgDoorHinges} alt="" className="np-bay-hinges" />
+        {/* Hinges — darken in sync with door open angle */}
+        <motion.img src={A.imgDoorHinges} alt="" className="np-bay-hinges" style={{ filter: hingesBrightness }} />
 
       </div>
 

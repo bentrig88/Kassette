@@ -1343,6 +1343,17 @@ input[type='range'] {
   inset: 0;
   border-radius: 5px;
 }
+.np-bay-door-shadow {
+  position: absolute;
+  bottom: -123px;
+  left: -2px;
+  right: -1px;
+  height: 122px;
+  background: linear-gradient(to bottom right, rgba(0,0,0,0.65) 0%, transparent 100%);
+  transform-origin: top left;
+  pointer-events: none;
+  z-index: 9;
+}
 .np-bay-door-wrap {
   position: absolute;
   inset: 0;
@@ -1357,6 +1368,24 @@ input[type='range'] {
   border-radius: 0;
   backface-visibility: hidden;
   overflow: visible;
+}
+.np-bay-door-edge {
+  position: absolute;
+  top: 122px;
+  left: -68px;
+  height: 12px;
+  background: #dadace;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35);
+  border-radius: 2px 2px 0 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.np-bay-door-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,1);
+  pointer-events: none;
+  z-index: 1;
 }
 .np-bay-door-img {
   width: 100%;
