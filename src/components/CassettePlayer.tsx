@@ -156,7 +156,39 @@ export function CassettePlayer() {
   }
   function handleStop() { setPendingPlay(false); try { getMusicKitInstance().stop(); setCurrentTime(0) } catch {/* */} }
 
+  function handleNextTrack() {
+    const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
+    const nextIdx = currentTrackIndexRef.current + 1
+    if (nextIdx < q.length) playQueueFrom(q, nextIdx).catch(() => {})
+  }
+
+  function handlePrevTrack() {
+    const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
+    const prevIdx = currentTrackIndexRef.current - 1
+    if (prevIdx >= 0) playQueueFrom(q, prevIdx).catch(() => {})
+    else { try { getMusicKitInstance().seekToTime(0) } catch {/* */} }
+  }
+
+  // Media Session API — maps Mac keyboard play/pause (and next/prev) to transport controls
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || !isInserted) return
+    navigator.mediaSession.setActionHandler('play', () => { playReg(); handlePause() })
+    navigator.mediaSession.setActionHandler('pause', () => { playReg(); handlePause() })
+    navigator.mediaSession.setActionHandler('stop', () => { playReg(); handleStop() })
+    navigator.mediaSession.setActionHandler('nexttrack', () => { playReg(); handleNextTrack() })
+    navigator.mediaSession.setActionHandler('previoustrack', () => { playReg(); handlePrevTrack() })
+    return () => {
+      navigator.mediaSession.setActionHandler('play', null)
+      navigator.mediaSession.setActionHandler('pause', null)
+      navigator.mediaSession.setActionHandler('stop', null)
+      navigator.mediaSession.setActionHandler('nexttrack', null)
+      navigator.mediaSession.setActionHandler('previoustrack', null)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInserted, playbackState])
+
   const fbPressRef = useRef<{ startedAt: number; positionAt: number } | null>(null)
+  const fbRafRef = useRef<number | null>(null)
   function getAudioEl() { return document.querySelector('audio') as HTMLAudioElement | null }
   function startFF() { setReelModifier(1); const el = getAudioEl(); if (el) el.playbackRate = 8 }
   function stopFF() { setReelModifier(0); const el = getAudioEl(); if (el) el.playbackRate = 1 }
@@ -165,8 +197,18 @@ export function CassettePlayer() {
     const el = getAudioEl(); if (el) el.muted = true
     fbPressRef.current = { startedAt: Date.now(), positionAt: getMusicKitInstance().currentPlaybackTime }
     rewindSFX.play()
+    // Drive the progress bar backward in real time
+    function tick() {
+      if (!fbPressRef.current) return
+      const heldSeconds = (Date.now() - fbPressRef.current.startedAt) / 1000
+      const simulated = Math.max(0, fbPressRef.current.positionAt - heldSeconds * 8)
+      setCurrentTime(simulated)
+      fbRafRef.current = requestAnimationFrame(tick)
+    }
+    fbRafRef.current = requestAnimationFrame(tick)
   }
   function stopFB() {
+    if (fbRafRef.current !== null) { cancelAnimationFrame(fbRafRef.current); fbRafRef.current = null }
     if (!fbPressRef.current) return
     const heldSeconds = (Date.now() - fbPressRef.current.startedAt) / 1000
     const target = Math.max(0, fbPressRef.current.positionAt - heldSeconds * 8)

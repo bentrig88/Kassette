@@ -176,7 +176,7 @@ export function analyzeBuffer(
  * Returns null if not enough data yet.
  */
 export function computeFeatures(
-  id: string,
+  _id: string,
   state: AnalysisState
 ): { bpm: number; energy: number; mood: number } | null {
   // Need at least 10 peaks for BPM and 100 energy samples (~5s)

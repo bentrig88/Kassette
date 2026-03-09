@@ -15,27 +15,27 @@ export const GENRE_COLORS: Record<Genre, string> = {
 export const GENRE_KEYWORDS: Record<Genre, string[]> = {
   'Rock': [
     'rock', 'metal', 'punk', 'grunge', 'alternative', 'indie rock', 'hard rock',
-    'blues', 'prog-rock', 'art rock',
+    'blues', 'prog-rock', 'art rock', 'punk', 'metal', 'heavy metal',
   ],
   'Hip-Hop': [
-    'hip-hop', 'hip hop', 'rap', 'trap', 'r&b', 'r&amp;b', 'soul',
-    'uk hip-hop', 'afro rap',
+    'hip-hop', 'hip hop', 'rap', 'trap', 'r&b', 'r&amp;b', 'soul', 'alternative rap',
+    'uk hip-hop', 'afro rap', 'rap français', 'rap/electro', 'old school rap', 'hardcore rap',
   ],
   'Electronic': [
     'electronic', 'electro', 'techno', 'house', 'edm', 'dance', 'synth', 'trance', 'ambient',
     'idm', 'experimental', 'bass', 'breakbeat', 'électronique', 'drum and bass',
-    'dubstep', 'garage', 'jungle', 'anime',
+    'dubstep', 'garage', 'jungle', 'anime', 'idm/experimental', 'electronica', 'breakbeat',
   ],
   'Reggae': [
     'reggae', 'dancehall', 'ska', 'dub',
-    'afro-beat', 'afrobeat', 'afro beat', 'worldwide',
+    'afro-beat', 'afrobeat', 'afro beat', 'worldwide', 'roots reggae',
   ],
   'Classical': [
     'classical', 'orchestra', 'symphony', 'opera', 'chamber', 'baroque', 'piano',
     'instrumental', 'soundtrack', 'score',
   ],
   'Folk': [
-    'folk', 'country', 'bluegrass', 'acoustic',
+    'folk', 'country', 'bluegrass', 'acoustic', 'folk-rock', 'alternative folk',
     'singer-songwriter', 'singer/songwriter', 'americana',
   ],
   'Jazz': [
