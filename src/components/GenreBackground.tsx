@@ -93,11 +93,15 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
                 animate={{ clipPath: clipPath(layer.direction, 'end') }}
                 transition={{ duration: 0.5, ease: [0, 0, 0.58, 1] }}
                 onAnimationComplete={() => {
-                  // Once the top layer has fully covered the screen, drop the
-                  // layers beneath it (their removal is invisible).
-                  if (isTop && layers.length > 1) {
-                    setLayers((cur) => cur.slice(-1))
-                  }
+                  // Once THIS layer is the current top and has finished wiping in,
+                  // drop the now-hidden layers beneath it. Keyed on the stable
+                  // layer.id (not a render-time isTop/length snapshot) so rapid
+                  // tape-switching cannot prune a layer that is still animating.
+                  setLayers((cur) =>
+                    cur.length > 1 && cur[cur.length - 1].id === layer.id
+                      ? cur.slice(-1)
+                      : cur,
+                  )
                 }}
               />
             )
