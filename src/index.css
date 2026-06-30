@@ -605,6 +605,7 @@ input[type='range'] {
 .nav-arrow {
   width: 3.25rem;
   height: 3.25rem;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -617,6 +618,11 @@ input[type='range'] {
   background: rgba(255, 255, 255, 0.2);
   transition: opacity 0.15s;
 }
+
+/* The ‹ / › glyphs are biased toward their pointing side; pad the inner edge
+   to push each glyph back to the optical center of its circle. */
+.carousel-nav .nav-arrow:first-child { padding-left: 8px; }
+.carousel-nav .nav-arrow:last-child { padding-right: 8px; }
 
 .nav-arrow:hover:not(:disabled) {
   opacity: 0.7;
