@@ -308,6 +308,22 @@ input[type='range'] {
   z-index: 30;
 }
 
+.carousel-title {
+  position: absolute;
+  bottom: calc(100% + 16px);
+  left: 0;
+  width: 100%;
+  margin: 0;
+  text-align: center;
+  font-family: 'Afacad', sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
 .carousel-track-container {
   overflow: visible;
   width: 100%;
