@@ -22,8 +22,8 @@ export const genreBodyMap: Record<string, string> = {
   'Hip-Hop':    _imgBody2Flat,
   'Electronic': _imgBody3Flat,
   'Reggae':     _imgBody4Flat,
-  'Classical':  _imgBody5Flat,
-  'Folk':       _imgBody6Flat,
+  'Classical':  _imgBody6Flat,
+  'Folk':       _imgBody5Flat,
   'Jazz':       _imgBody7Flat,
   'Pop':        _imgBody8Flat,
 }
