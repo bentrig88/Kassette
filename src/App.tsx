@@ -139,22 +139,19 @@ export default function App() {
     <>
     <SceneBackground />
     <div className="app">
-      <div className="app-header">
-        <span className="app-logo">Kassette</span>
-        <button
-          className="signout-btn"
-          onClick={async () => {
-            try {
-              getMusicKitInstance().stop()
-              await getMusicKitInstance().unauthorize()
-            } catch {/* */}
-            setAuthenticated(false)
-            setCassettes([])
-          }}
-        >
-          Sign out
-        </button>
-      </div>
+      <button
+        className="signout-btn signout-btn--floating"
+        onClick={async () => {
+          try {
+            getMusicKitInstance().stop()
+            await getMusicKitInstance().unauthorize()
+          } catch {/* */}
+          setAuthenticated(false)
+          setCassettes([])
+        }}
+      >
+        Sign out
+      </button>
 
       <div className="app-main">
         <CassetteCarousel />

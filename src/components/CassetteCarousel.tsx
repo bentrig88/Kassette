@@ -180,6 +180,13 @@ export function CassetteCarousel() {
             exit={{ opacity: 0, transition: { duration: 0 } }}
             transition={{ duration: 0.3 }}
           >
+            <motion.h2
+              className="carousel-title"
+              animate={{ opacity: isInserting ? 0 : 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              Choose your genre
+            </motion.h2>
             <div
               className="carousel-track-container"
               style={{ padding: `0 calc(50% - ${dims.width / 2}px)` }}
