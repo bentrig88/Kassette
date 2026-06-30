@@ -52,13 +52,17 @@ export function PlaylistController() {
   // Selected subgenres; empty = "All" (no subgenre restriction).
   const [subgenres, setSubgenres] = useState<string[]>([])
 
-  // Distinct subgenres present in the inserted cassette's tracks (no "All" —
-  // the SubgenreSelect adds it).
+  // Distinct subgenres present in the actual queue pool (baseQueue is capped at
+  // 100 tracks by loadCassetteQueue). Deriving options from the SAME pool used
+  // for filtering guarantees every listed subgenre has matching tracks — building
+  // from currentCassette.tracks (the full set) would list subgenres that exist
+  // only beyond the 100-track slice, which then filter to an empty queue.
   const subgenreOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const t of currentCassette?.tracks ?? []) for (const g of t.genreNames) set.add(g)
+    const src = baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? [])
+    for (const t of src) for (const g of t.genreNames) set.add(g)
     return [...set].sort((a, b) => a.localeCompare(b))
-  }, [currentCassette])
+  }, [baseQueue, currentCassette])
 
   // Reset to All whenever a new cassette is inserted (adjust-state-on-change
   // pattern — runs during render, no effect).
