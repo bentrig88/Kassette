@@ -29,11 +29,18 @@ src/
     musicStore.ts       Auth state, cassettes array, selected carousel index, loading
     playerStore.ts      Playback state, inserted cassette, queuedTracks, volume, quality, filter sliders
   services/
-    appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader
+    appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
+    audioAnalysis.ts    analyzeBuffer() — raw BPM/energy/mood from a decoded preview clip
+    featureCache.ts     IndexedDB cache (kassette-features v4) for raw TrackFeatures
+    featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
+  lib/
+    mapPool.ts          Bounded-concurrency async pool (used by the analysis hooks)
   hooks/
     useKeyboardNav.ts   Left/right arrow key navigation for carousel
     useVUMeter.ts       Simulated animated VU meter bars
     useAudioFilter.ts   Web Audio low-pass filter for tape quality simulation
+    usePreviewAnalysis.ts   Analyzes the active queue's previews (concurrency pool)
+    useBackgroundAnalysis.ts Analyzes the rest of the library after a 10s delay (concurrency pool)
     useRewindSFX.ts     SFX chain for fast-backward (start → loop → end)
     useButtonSFX.ts     One-shot SFX for transport button presses (reg + eject variants)
     useMotorSFX.ts      Looping motor SFX that runs while playbackState is playing or loading
@@ -175,20 +182,26 @@ Three sliders (Pace/Tempo, Energy, Mood) dynamically re-sort the upcoming queue 
 
 ### Audio Feature Extraction
 Apple Music API does **not** expose audio features to developers (400 error on the audio-features endpoint). Instead, features are extracted from **30-second preview clips** attached to each catalog song:
-1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs and extracts `attributes.previews[0].url`
-2. `analyzeBuffer(id, buffer)` — runs on a decoded `AudioBuffer` (via `AudioContext.decodeAudioData`):
-   - **Energy**: RMS of the full signal, normalized 0–100
-   - **Mood**: zero-crossing rate as a brightness proxy, normalized 0–100
-   - **BPM**: autocorrelation of onset-strength envelope (standard musicology approach), folded into 60–150 range
-3. Results cached in IndexedDB (`kassette-features`, v3) via `featureCache.ts`
+1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs (300/req) and extracts `attributes.previews[0].url`
+2. `analyzeBuffer(id, buffer)` (`audioAnalysis.ts`) — runs on a decoded `AudioBuffer` and returns **RAW** measurements (no fixed 0–100 scaling):
+   - **energyRaw**: linear RMS of the whole clip (loudness/intensity proxy)
+   - **moodRaw**: zero-crossing rate in Hz (brightness proxy; higher = brighter)
+   - **bpm**: autocorrelation of an onset-strength (energy-envelope) signal, folded into 60–150
+3. Results cached in IndexedDB (`kassette-features`, **v4** — bumped when raw storage was introduced) via `featureCache.ts`
 4. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
 
+### Library-Relative Normalization (`featureNormalize.ts`)
+Raw measurements have no meaningful absolute 0–100 mapping — a fixed constant makes most tracks cluster in a narrow band and the sliders feel dead. Instead `buildNormalizer(featuresMap)` converts each raw value to its **percentile rank within the user's own analyzed library** → `{ pace, energy, mood }` (0 = lowest in library, 100 = highest). This self-calibrates so the sliders always span the full range. The normalizer is cheap (one sort per metric) and rebuilt as analysis fills in more tracks (memoized on `featuresMap` at call sites). With ≤1 analyzed track, all metrics return a neutral 50.
+
 ### Analysis Priority & Background Processing
-- **Active cassette**: `usePreviewAnalysis(displayQueue)` analyzes the 100-track queue one track at a time (100ms between tracks). Runs immediately on cassette insert.
-- **All other tracks**: `useBackgroundAnalysis(allTracks)` starts after a 10s delay, processes every library track at 1s/track, skipping already-cached entries. Ensures subsequent cassette inserts have data ready.
+Both passes use a **bounded concurrency pool** (`lib/mapPool.ts`, `CONCURRENCY = 6`) — up to 6 clips fetched + decoded + analyzed in parallel. (Previously each pass was a sequential loop with an artificial per-track delay — 100ms active / 1s background — which made full-library coverage take 30+ minutes; the pool removes that.)
+- **Active cassette**: `usePreviewAnalysis(displayQueue)` analyzes the active queue on cassette insert.
+- **All other tracks**: `useBackgroundAnalysis(allTracks)` starts after a 10s delay (so the active cassette gets priority) and analyzes the rest of the library, skipping already-cached entries.
+Both cancel cleanly on unmount (a `cancelled` flag passed to `mapPool`'s `shouldStop`).
 
 ### Sorting Logic
 `sortTracksByFilters(tracks, featuresMap, tempo, energy, mood)` in `appleMusic.ts`:
+- Builds a `buildNormalizer` over `featuresMap` and precomputes each analyzed track's percentile `{ pace, energy, mood }` once (comparator stays O(1) per pair).
 - Each slider (0–100) is a **directional weight**, not a target: slider 0 = want lowest, slider 100 = want highest, slider 50 = neutral (no effect)
 - Only the **upcoming tracks** (after currentTrackIndex) are re-sorted — the current track is never affected
 - Unanalyzed tracks go to the end, preserving their shuffled order
@@ -201,17 +214,18 @@ Apple Music API does **not** expose audio features to developers (400 error on t
 - Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order
 
 ### Slider Auto-Snap
-When a new track starts, the three sliders automatically move to reflect that track's BPM/energy/mood position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag).
+When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag).
 
 ### Sliders Disabled State
 If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (`pointer-events: none`) with the message "Analyzing your tape… N/20 tracks ready". They unlock automatically as analysis progresses.
 
 ### Track Display
-The CassettePlayer LCD screen shows `BPM / NRG / MOD` metadata for the current track if analysis data is available, or `NO DATA` otherwise. Useful for verifying analysis accuracy.
+The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next) track. **BPM is the actual detected tempo**; **NRG and MOD are the library-relative percentiles** (0–100) from the normalizer, not raw values.
 
 ### Known Limitations / Future Work
-- BPM accuracy is reasonable for most genres but imperfect (30s preview, onset detection)
-- Energy and Mood (ZCR-based) are rough proxies — could be improved with FFT-based spectral features
+- BPM accuracy is reasonable for most genres but imperfect (30s preview, energy-envelope onset detection, octave folding to 60–150). Better: spectral-flux onsets + a tempo prior.
+- Energy (RMS) and Mood (ZCR) are still crude raw proxies — only the *normalization* is improved, not the measurements. Better mood: spectral centroid + major/minor key detection. Better energy: combine loudness with spectral flux. Best overall: Essentia.js in a Web Worker.
+- The real-time `AnalyserNode` analysis path (`feedFrame`/`computeFeatures`/`useTrackAnalysis`) was dead code and has been **removed** — only the preview-clip `analyzeBuffer` path runs.
 - Sliders reset to track values on track change, which can conflict with user-set filters if user wants persistent filtering across tracks
 - Phase 3 will redesign the full UI
 
