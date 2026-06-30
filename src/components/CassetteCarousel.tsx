@@ -7,6 +7,7 @@ import { loadCassetteQueue } from '../services/appleMusic'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import type { Cassette } from '../types/music'
 import { CassetteTapeBody } from './CassetteTapeBody'
+import { GenreBackground } from './GenreBackground'
 
 const BASE_CASSETTE_GAP = 100
 const BASE_CASSETTE_HEIGHT = 140
@@ -167,31 +168,7 @@ export function CassetteCarousel() {
 
   return (
     <>
-      <AnimatePresence>
-        {!isInserted && !isInserting && (
-          <motion.div
-            key="blur-overlay"
-            className="carousel-blur-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {!isInserted && !isInserting && (
-          <motion.div
-            key="white-overlay"
-            className="carousel-white-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-          />
-        )}
-      </AnimatePresence>
+      <GenreBackground isInserting={isInserting} />
 
       <AnimatePresence>
         {!isInserted && (

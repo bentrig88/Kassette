@@ -259,24 +259,34 @@ input[type='range'] {
   overflow: hidden;
 }
 
-/* ─── Blur overlay — behind carousel, above player ─────────── */
-.carousel-blur-overlay {
+/* ─── Genre background — per-tape photo behind the carousel ─── */
+.genre-bg-root {
   position: fixed;
   inset: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: rgba(0, 0, 0, 0.35);
   z-index: 20;
   pointer-events: none;
+  overflow: hidden;
 }
 
-/* ─── White overlay — above player, below blur layer ────────── */
-.carousel-white-overlay {
-  position: fixed;
+.genre-bg-photo {
+  position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.4);
-  z-index: 15;
-  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Subtle dark scrim so white cassettes + Insert Tape button stay legible */
+.genre-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45) 0%,
+    rgba(0, 0, 0, 0.22) 40%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
 }
 
 /* ─── Cassette Carousel ────────────────────────────────────── */
