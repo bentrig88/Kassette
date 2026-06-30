@@ -30,7 +30,7 @@ src/
     playerStore.ts      Playback state, inserted cassette, queuedTracks, volume, quality, filter sliders
   services/
     appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
-    audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, centroid, chroma, KS key); runs in the worker
+    audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, spectral flux + tempo prior, centroid, chroma, KS key); runs in the worker
     analysisClient.ts   Main-thread worker owner: resample (11kHz mono) + RPC → analyzeAudioBuffer()
     featureCache.ts     IndexedDB cache (kassette-features v5) for raw TrackFeatures
     featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
@@ -190,8 +190,8 @@ Apple Music API does **not** expose audio features to developers (400 error on t
 3. `analyzePCM(id, samples, sampleRate)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) returns **RAW** measurements (no fixed 0–100 scaling):
    - **energyRaw**: linear RMS of the whole clip (loudness/intensity proxy)
    - **moodRaw**: 0–1 blend of **brightness** (mean spectral centroid via a hand-rolled radix-2 FFT) and **musical mode** (major→happier / minor→darker), where mode comes from an FFT **chroma** vector matched against **Krumhansl–Schmuckler** key profiles. Weighting: `0.6·brightness + 0.4·mode`. (Replaced the old zero-crossing-rate proxy.)
-   - **bpm**: autocorrelation of an onset-strength (energy-envelope) signal, folded into 60–150
-4. Results cached in IndexedDB (`kassette-features`, **v5** — bumped when mood became the centroid+key blend) via `featureCache.ts`
+   - **bpm**: autocorrelation of a **spectral-flux** onset novelty curve (sum of positive bin-to-bin magnitude changes), each lag's score weighted by a **log-Gaussian tempo prior** (~120 BPM) to resolve half/double-tempo octave errors, clamped to 50–200 (no lossy folding)
+4. Results cached in IndexedDB (`kassette-features`, **v6** — bumped when BPM moved to spectral-flux + tempo prior) via `featureCache.ts`
 5. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
 
 The worker is a singleton owned by `analysisClient.ts`, which correlates requests/responses by an incrementing `reqId` (promise map). The concurrency pool (below) parallelizes network + decode + resample on the main thread; the single worker serializes the heavy DSP so the UI never janks.
@@ -229,7 +229,7 @@ If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (
 The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next) track. **BPM is the actual detected tempo**; **NRG and MOD are the library-relative percentiles** (0–100) from the normalizer, not raw values.
 
 ### Known Limitations / Future Work
-- BPM accuracy is reasonable for most genres but imperfect (30s preview, energy-envelope onset detection, octave folding to 60–150). Better: spectral-flux onsets + a tempo prior.
+- BPM uses spectral-flux onsets + a tempo prior over a 30s preview — solid on clear-beat genres (verified exact on synthetic 80–160 BPM click tracks), still imperfect on rubato/ambient material.
 - Mood is now brightness (spectral centroid) + major/minor mode (chroma + Krumhansl key profiles) — a real musical signal, though still a heuristic proxy for valence (no trained model). Energy is still raw RMS (could add spectral flux / loudness for a better "energy" sense).
 - Best overall future upgrade: Essentia.js in the worker (RhythmExtractor2013 for BPM+confidence, KeyExtractor, loudness) — the worker plumbing is already in place.
 - The real-time `AnalyserNode` analysis path (`feedFrame`/`computeFeatures`/`useTrackAnalysis`) was dead code and has been **removed** — only the preview-clip worker path runs.
