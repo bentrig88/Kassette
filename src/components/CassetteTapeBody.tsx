@@ -41,14 +41,15 @@ export function CassetteTapeBody({ cassette, reelSpeed = 0 }: Props) {
   return (
     <div className="ct-body">
       {/* Reels — behind the body, visible through the transparent window */}
-      <img ref={leftReelRef} src={CA.imgLeftReelTape} alt="" className="ct-abs ct-reel-left" />
-      <img ref={rightReelRef} src={CA.imgRightReelTape} alt="" className="ct-abs ct-reel-right" />
+      <img ref={leftReelRef} src={CA.imgLeftReelTape} alt="" className="ct-abs ct-reel-left" draggable={false} />
+      <img ref={rightReelRef} src={CA.imgRightReelTape} alt="" className="ct-abs ct-reel-right" draggable={false} />
 
       {/* Body — genre-to-style mapping defined in cassetteAssets.ts */}
       <div className="ct-abs ct-swapable">
         <img
           src={CA.genreBodyMap[cassette.genre]}
           alt=""
+          draggable={false}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
         />
       </div>

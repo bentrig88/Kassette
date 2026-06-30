@@ -374,6 +374,14 @@ input[type='range'] {
   height: 100%;
   overflow: visible;
   isolation: isolate; /* creates stacking context so child z-indices are self-contained */
+  user-select: none;
+}
+
+/* Stop native image drag-and-drop (the copy-cursor ghost) from hijacking the
+   carousel drag. draggable={false} covers Chrome/Firefox; this covers WebKit. */
+.ct-body img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 /* Explicit stacking order within ct-body — prevents implicit DOM-order stacking
