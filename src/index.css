@@ -380,7 +380,7 @@ input[type='range'] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   pointer-events: none;
 }
 
@@ -399,6 +399,7 @@ input[type='range'] {
   font-weight: 700;
   font-size: 6rem;
   line-height: 1;
+  margin-top: -6px;
   letter-spacing: 0.01em;
   text-transform: uppercase;
   color: #fff;
