@@ -210,31 +210,6 @@ input[type='range'] {
   overflow: hidden;
 }
 
-.app-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 2rem;
-  z-index: 25;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-}
-
-.app-logo {
-  font-family: 'Afacad', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: 0;
-  color: #fff;
-  text-transform: uppercase;
-}
-
 .signout-btn {
   font-family: 'Afacad', sans-serif;
   font-weight: 500;
@@ -248,6 +223,14 @@ input[type='range'] {
 
 .signout-btn:hover {
   opacity: 0.7;
+}
+
+/* Floating top-right corner — replaces the removed nav bar */
+.signout-btn--floating {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.5rem;
+  z-index: 40;
 }
 
 .app-main {
