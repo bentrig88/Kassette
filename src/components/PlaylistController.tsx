@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { usePlayerStore } from '../store/playerStore'
-import { sortTracksByFilters, setQueueTracks } from '../services/appleMusic'
+import { sortTracksByFilters } from '../services/appleMusic'
 import { SubgenreSelect } from './SubgenreSelect'
 
 interface SliderProps {
@@ -100,10 +100,10 @@ export function PlaylistController() {
       setQueuedTracks(newQueue)
 
       if (rebuild) {
-        // Re-point to the new first track and re-sync MusicKit's queue (without
-        // playing) so pressing Play starts at the refreshed "now" track.
+        // Re-point to the new first track; the next Play re-syncs MusicKit's queue
+        // via playQueueFrom (see CassettePlayer.handlePlay), which is the proven
+        // setQueue-then-play path.
         setCurrentTrackIndex(0)
-        setQueueTracks(newQueue).catch(() => {})
       }
     },
     [isInserted, playbackState, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, setQueuedTracks, setCurrentTrackIndex]

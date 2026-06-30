@@ -16,33 +16,33 @@ const CONCURRENCY = 6
  */
 export function usePreviewAnalysis(tracks: Track[]) {
   const addFeatures = usePlayerStore((s) => s.addFeatures)
-  const runningRef = useRef(false)
   const tracksRef = useRef(tracks)
 
-  // Mirror the latest tracks into a ref so the long-running analysis loop can
-  // read the current queue without restarting.
+  // Mirror the latest tracks into a ref so the analysis loop reads the current
+  // queue. (Updated in an effect — never during render.)
   useEffect(() => { tracksRef.current = tracks }, [tracks])
 
+  // Re-run only when the SET of track ids changes — NOT on reorder. This way
+  // subgenre filtering (different tracks) triggers fresh analysis, while slider
+  // re-sorts (same tracks, new order) don't restart it.
+  const idKey = tracks.map((t) => t.id).slice().sort().join('|')
+
   useEffect(() => {
-    if (tracks.length === 0 || runningRef.current) return
-    runningRef.current = true
+    const queue = tracksRef.current
+    if (queue.length === 0) return
     let cancelled = false
 
     async function run() {
-      const queue = tracksRef.current
-
       // Skip tracks already in IndexedDB
       const uncached = (
         await Promise.all(queue.map(async (t) => ((await getFeatures(t.id)) ? null : t)))
       ).filter((t): t is Track => t !== null)
 
-      if (cancelled || uncached.length === 0) {
-        runningRef.current = false
-        return
-      }
+      if (cancelled || uncached.length === 0) return
 
       // Fetch preview URLs for uncached tracks
       const previewMap = await fetchPreviewUrls(uncached)
+      if (cancelled) return
 
       const audioCtx = new AudioContext()
 
@@ -64,10 +64,12 @@ export function usePreviewAnalysis(tracks: Track[]) {
       }, () => cancelled)
 
       await audioCtx.close().catch(() => {})
-      runningRef.current = false
     }
 
     run()
+    // Changing queue (new idKey) cancels the in-flight run and starts a fresh
+    // one for the new set, so a subgenre filter's tracks get analyzed promptly.
     return () => { cancelled = true }
-  }, [tracks, addFeatures])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idKey, addFeatures])
 }

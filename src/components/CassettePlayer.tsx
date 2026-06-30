@@ -138,11 +138,15 @@ export function CassettePlayer() {
     try {
       const music = getMusicKitInstance()
       if (playbackState === 'playing') { music.stop(); return }
-      if (playbackState !== 'paused') {
-        music.stop()
-        setPendingPlay(true)
-      }
-      await music.play()
+      if (playbackState === 'paused') { await music.play(); return }
+      // Fresh start from stopped: sync MusicKit to our (possibly subgenre-filtered)
+      // queue and play from the current track. playQueueFrom does setQueue+play
+      // (no stop() — which would confuse MusicKit and silently fail).
+      setPendingPlay(true)
+      const q = queuedTracksRef.current.length > 0
+        ? queuedTracksRef.current
+        : (currentCassetteRef.current?.tracks ?? [])
+      await playQueueFrom(q, currentTrackIndexRef.current)
     } catch (e) { setPendingPlay(false); console.error(e) }
   }
 
