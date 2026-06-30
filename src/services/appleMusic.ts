@@ -170,6 +170,21 @@ export function buildCassettes(tracks: Track[]): Cassette[] {
 /**
  * Sets MusicKit queue to the cassette's tracks and optionally starts playback.
  */
+/**
+ * Sync MusicKit's internal queue to `tracks` (first 100) WITHOUT starting
+ * playback — used to keep the queue coherent when the upcoming list is rebuilt
+ * while stopped, so the next Play starts at the new first track.
+ */
+export async function setQueueTracks(tracks: Track[]): Promise<void> {
+  const music = MusicKit.getInstance()
+  const items = tracks
+    .slice(0, 100)
+    .map((t) => rawItemCache.get(t.id))
+    .filter((item): item is MusicKit.MediaItem => item !== undefined)
+  if (items.length === 0) return
+  await music.setQueue({ items })
+}
+
 export async function loadCassetteQueue(cassette: Cassette, startIndex = 0): Promise<Track[]> {
   const music = MusicKit.getInstance()
 

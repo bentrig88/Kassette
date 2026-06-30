@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { usePlayerStore } from '../store/playerStore'
-import { sortTracksByFilters } from '../services/appleMusic'
+import { sortTracksByFilters, setQueueTracks } from '../services/appleMusic'
 import { SubgenreSelect } from './SubgenreSelect'
 
 interface SliderProps {
@@ -48,6 +48,8 @@ export function PlaylistController() {
   const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
   const baseQueue = usePlayerStore((s) => s.baseQueue)
   const isInserted = usePlayerStore((s) => s.isInserted)
+  const playbackState = usePlayerStore((s) => s.playbackState)
+  const setCurrentTrackIndex = usePlayerStore((s) => s.setCurrentTrackIndex)
 
   // Selected subgenres; empty = "All" (no subgenre restriction).
   const [subgenres, setSubgenres] = useState<string[]>([])
@@ -73,10 +75,14 @@ export function PlaylistController() {
   // the sliders. Basing on baseQueue (not the current, possibly-filtered queue)
   // lets clearing the selection restore everything.
   const applyAll = useCallback(
-    (tempo: number, energy: number, mood: number, subs: string[]) => {
+    (tempo: number, energy: number, mood: number, subs: string[], rebuildNow = false) => {
       if (!isInserted) return
 
-      const played = queuedTracks.slice(0, currentTrackIndex + 1)
+      // When nothing is playing, a subgenre change rebuilds the WHOLE queue
+      // (including the "now" track) so it reflects the new selection; otherwise
+      // the current track is preserved and only the upcoming list changes.
+      const rebuild = rebuildNow && playbackState === 'stopped'
+      const played = rebuild ? [] : queuedTracks.slice(0, currentTrackIndex + 1)
       const playedIds = new Set(played.map((t) => t.id))
 
       // Subgenre filter searches the FULL cassette (so niche subgenres beyond the
@@ -90,9 +96,17 @@ export function PlaylistController() {
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
       const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood)
-      setQueuedTracks([...played, ...sortedUpcoming])
+      const newQueue = [...played, ...sortedUpcoming]
+      setQueuedTracks(newQueue)
+
+      if (rebuild) {
+        // Re-point to the new first track and re-sync MusicKit's queue (without
+        // playing) so pressing Play starts at the refreshed "now" track.
+        setCurrentTrackIndex(0)
+        setQueueTracks(newQueue).catch(() => {})
+      }
     },
-    [isInserted, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, setQueuedTracks]
+    [isInserted, playbackState, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, setQueuedTracks, setCurrentTrackIndex]
   )
 
   function handleTempo(v: number) {
@@ -112,7 +126,7 @@ export function PlaylistController() {
 
   function handleSubgenres(next: string[]) {
     setSubgenres(next)
-    applyAll(tempoFilter, energyFilter, moodFilter, next)
+    applyAll(tempoFilter, energyFilter, moodFilter, next, true)
   }
 
   const upcoming = (queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? []))
