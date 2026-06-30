@@ -227,7 +227,7 @@ input[type='range'] {
 }
 
 .app-logo {
-  font-family: 'Kode Mono', monospace;
+  font-family: 'Afacad', sans-serif;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 0;
@@ -236,7 +236,7 @@ input[type='range'] {
 }
 
 .signout-btn {
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Afacad', sans-serif;
   font-weight: 500;
   color: #fff;
   font-size: 0.8rem;
@@ -558,7 +558,7 @@ input[type='range'] {
   color: #fff;
   padding: 1.25rem 4rem;
   border-radius: 9999px;
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Afacad', sans-serif;
   font-weight: 500;
   font-size: 1.3rem;
   letter-spacing: 2px;
@@ -1024,14 +1024,14 @@ input[type='range'] {
 }
 
 .pf-title {
-  font-family: 'Kode Mono', monospace;
+  font-family: 'Afacad', sans-serif;
   font-weight: 700;
   font-size: 20px;
   color: #fff;
 }
 
 .pf-analyzed {
-  font-family: 'Kode Mono', monospace;
+  font-family: 'Afacad', sans-serif;
   font-weight: 700;
   font-size: 10px;
   color: #fff;
@@ -1058,8 +1058,8 @@ input[type='range'] {
 }
 
 .pf-filter-label {
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 900;
+  font-family: 'Afacad', sans-serif;
+  font-weight: 700;
   font-size: 20px;
   color: #fff;
   line-height: 1;
@@ -1119,7 +1119,7 @@ input[type='range'] {
 .pf-labels {
   display: flex;
   justify-content: space-between;
-  font-family: 'Montserrat', sans-serif;
+  font-family: 'Afacad', sans-serif;
   font-weight: 400;
   font-size: 14px;
   color: #fff;
