@@ -3,7 +3,8 @@
  * inside a Web Worker, off the main thread. Returns RAW measurements; absolute
  * 0–100 scaling happens library-relative in featureNormalize.ts.
  *
- * bpm       — autocorrelation of an energy-envelope onset signal, folded 60–150
+ * bpm       — autocorrelation of a spectral-flux onset novelty curve, disambiguated
+ *             by a log-Gaussian tempo prior (~120 BPM), clamped to 50–200
  * energyRaw — linear RMS of the whole clip (loudness/intensity proxy)
  * moodRaw   — 0–1 blend of brightness (spectral centroid) and musical mode
  *             (major → happier, minor → darker), the latter from an FFT chroma
@@ -141,6 +142,72 @@ function spectralFeatures(data: Float32Array, sampleRate: number): {
   return { centroid, modeSign, modeConfidence }
 }
 
+// Perceptual tempo prior: log-Gaussian centered on 120 BPM (~1 octave spread).
+// Multiplying the autocorrelation by this resolves half/double-tempo octave
+// ambiguity in favour of the more likely musical tempo.
+function tempoPrior(bpm: number): number {
+  const x = Math.log2(bpm / 120) / 0.9
+  return Math.exp(-0.5 * x * x)
+}
+
+/**
+ * Estimate tempo from a spectral-flux onset novelty curve.
+ *
+ * Spectral flux (sum of positive bin-to-bin magnitude changes) is a far better
+ * onset detector than a time-domain RMS-envelope derivative — it fires on
+ * note/percussion onsets across the whole spectrum. The novelty curve is
+ * autocorrelated over lags spanning 50–200 BPM, each score weighted by the
+ * tempo prior, and the best lag wins (no lossy octave folding).
+ */
+function estimateTempo(data: Float32Array, sampleRate: number): number {
+  const N = 1024
+  const half = N / 2
+  const hop = Math.max(64, Math.round(sampleRate * 0.0116)) // ~11.6 ms frame rate
+  if (data.length < N + hop) return 120
+
+  const hann = new Float32Array(N)
+  for (let i = 0; i < N; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1))
+  const re = new Float32Array(N)
+  const im = new Float32Array(N)
+  const prevMag = new Float32Array(half)
+
+  const flux: number[] = []
+  for (let start = 0; start + N <= data.length; start += hop) {
+    for (let i = 0; i < N; i++) { re[i] = data[start + i] * hann[i]; im[i] = 0 }
+    fft(re, im)
+    let sum = 0
+    for (let k = 1; k < half; k++) {
+      const mag = Math.sqrt(re[k] * re[k] + im[k] * im[k])
+      const d = mag - prevMag[k]
+      if (d > 0) sum += d // half-wave rectified
+      prevMag[k] = mag
+    }
+    flux.push(sum)
+  }
+  if (flux.length < 16) return 120
+
+  // Onset envelope: subtract the global mean and half-wave rectify to sharpen peaks.
+  let mean = 0
+  for (const v of flux) mean += v
+  mean /= flux.length
+  const onset = flux.map((v) => Math.max(0, v - mean))
+
+  const fps = sampleRate / hop
+  const lagMin = Math.round((fps * 60) / 200)
+  const lagMax = Math.min(onset.length - 1, Math.round((fps * 60) / 50))
+
+  let bestScore = -Infinity
+  let bestBpm = 120
+  for (let lag = lagMin; lag <= lagMax; lag++) {
+    let corr = 0
+    for (let i = 0; i + lag < onset.length; i++) corr += onset[i] * onset[i + lag]
+    const bpm = (fps * 60) / lag
+    const score = corr * tempoPrior(bpm)
+    if (score > bestScore) { bestScore = score; bestBpm = bpm }
+  }
+  return Math.round(Math.min(200, Math.max(50, bestBpm)))
+}
+
 /**
  * Analyzes raw mono PCM and returns raw BPM / energy / mood measurements.
  */
@@ -156,41 +223,8 @@ export function analyzePCM(id: string, data: Float32Array, sampleRate: number): 
   const modeScore = 0.5 + 0.5 * modeSign * modeConfidence       // 0 minor .. 1 major
   const moodRaw = 0.6 * brightness + 0.4 * modeScore            // 0..1
 
-  // ── BPM (autocorrelation of onset strength) ─────────────────
-  // Correlate the onset envelope with itself at different lags — the dominant
-  // lag is the beat period.
-  const hopSize = Math.floor(sampleRate * 0.01)    // 10ms hop
-  const frameSize = Math.floor(sampleRate * 0.023) // ~23ms frame
-  const numFrames = Math.floor((data.length - frameSize) / hopSize)
-
-  const env: number[] = []
-  for (let f = 0; f < numFrames; f++) {
-    const s = f * hopSize
-    let e = 0
-    for (let i = s; i < s + frameSize; i++) e += data[i] * data[i]
-    env.push(Math.sqrt(e / frameSize))
-  }
-
-  // Onset strength: half-wave rectified first derivative
-  const onset: number[] = [0]
-  for (let i = 1; i < env.length; i++) onset.push(Math.max(0, env[i] - env[i - 1]))
-
-  const framesPerSec = sampleRate / hopSize
-  const lagMin = Math.round((framesPerSec * 60) / 200) // 200 BPM
-  const lagMax = Math.round((framesPerSec * 60) / 50)  // 50 BPM
-
-  let bestLag = lagMin
-  let bestCorr = -1
-  for (let lag = lagMin; lag <= Math.min(lagMax, onset.length - 1); lag++) {
-    let corr = 0
-    for (let i = 0; i < onset.length - lag; i++) corr += onset[i] * onset[i + lag]
-    if (corr > bestCorr) { bestCorr = corr; bestLag = lag }
-  }
-
-  let bpm = bestLag > 0 ? Math.round((framesPerSec * 60) / bestLag) : 120
-  // Fold into natural range 60–150
-  while (bpm > 150) bpm = Math.round(bpm / 2)
-  while (bpm < 60) bpm = bpm * 2
+  // ── BPM (spectral-flux onsets + tempo prior) ────────────────
+  const bpm = estimateTempo(data, sampleRate)
 
   return { id, bpm, energyRaw, moodRaw, analyzedAt: Date.now() }
 }

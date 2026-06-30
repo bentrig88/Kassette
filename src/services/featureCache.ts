@@ -13,7 +13,7 @@ export interface TrackFeatures {
 
 const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
-const VERSION = 5 // bumped: moodRaw is now a centroid+key blend (was ZCR) — re-analyze
+const VERSION = 6 // bumped: BPM now spectral-flux + tempo prior (was energy-envelope) — re-analyze
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
