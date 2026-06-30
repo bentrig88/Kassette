@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
  * Values persist to localStorage so tuning survives reloads.
  */
 const BLUR_KEY = 'kassette-dbg-blur'
-const OVERLAY_KEY = 'kassette-dbg-scrim'
+const OVERLAY_KEY = 'kassette-dbg-darkness'
 
 function readNum(key: string, fallback: number): number {
   const v = Number(localStorage.getItem(key))
@@ -18,7 +18,7 @@ function readNum(key: string, fallback: number): number {
 export function BackgroundDebug() {
   const [open, setOpen] = useState(false)
   const [blur, setBlur] = useState(() => readNum(BLUR_KEY, 2))
-  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 1))
+  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 0.4))
 
   useEffect(() => {
     document.documentElement.style.setProperty('--genre-bg-blur', `${blur}px`)
@@ -47,7 +47,7 @@ export function BackgroundDebug() {
             />
           </div>
           <div className="dbg-row">
-            <label>Dark overlay <span>{overlay.toFixed(2)}</span></label>
+            <label>Dark overlay <span>{Math.round(overlay * 100)}%</span></label>
             <input
               type="range"
               min={0}

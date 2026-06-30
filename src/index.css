@@ -275,18 +275,13 @@ input[type='range'] {
 }
 
 
-/* Dark scrim so white cassettes + Insert Tape button stay legible.
-   Opacity is tunable via the BackgroundDebug panel (0 = no darkening). */
+/* Uniform dark overlay so white cassettes + Insert Tape button stay legible.
+   Opacity is tunable via the BackgroundDebug panel: 0 = transparent, 1 = solid black. */
 .genre-bg-scrim {
   position: absolute;
   inset: 0;
-  opacity: var(--genre-bg-overlay, 1);
-  background: linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.45) 0%,
-    rgba(0, 0, 0, 0.22) 40%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
+  background: #000;
+  opacity: var(--genre-bg-overlay, 0.4);
 }
 
 /* ─── Background debug panel (dev tuning tool) ─────────────── */
