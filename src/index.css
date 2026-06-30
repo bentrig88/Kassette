@@ -274,19 +274,13 @@ input[type='range'] {
   filter: blur(var(--genre-bg-blur, 2px));
 }
 
-/* Adjustable uniform dark overlay (BackgroundDebug); default fully transparent */
-.genre-bg-overlay {
-  position: absolute;
-  inset: 0;
-  background: #000;
-  opacity: var(--genre-bg-overlay, 0);
-  pointer-events: none;
-}
 
-/* Subtle dark scrim so white cassettes + Insert Tape button stay legible */
+/* Dark scrim so white cassettes + Insert Tape button stay legible.
+   Opacity is tunable via the BackgroundDebug panel (0 = no darkening). */
 .genre-bg-scrim {
   position: absolute;
   inset: 0;
+  opacity: var(--genre-bg-overlay, 1);
   background: linear-gradient(
     to bottom,
     rgba(0, 0, 0, 0.45) 0%,

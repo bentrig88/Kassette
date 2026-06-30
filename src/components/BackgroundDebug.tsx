@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
  * Dev-only tuning panel (tape-selection state, bottom-right). Two sliders drive
  * CSS variables read by the genre background:
  *   --genre-bg-blur    → blur strength on the photo (.genre-bg-photo)
- *   --genre-bg-overlay → opacity of the dark overlay (.genre-bg-overlay)
+ *   --genre-bg-overlay → opacity of the dark scrim (.genre-bg-scrim); 0 = none
  * Values persist to localStorage so tuning survives reloads.
  */
 const BLUR_KEY = 'kassette-dbg-blur'
-const OVERLAY_KEY = 'kassette-dbg-overlay'
+const OVERLAY_KEY = 'kassette-dbg-scrim'
 
 function readNum(key: string, fallback: number): number {
   const v = Number(localStorage.getItem(key))
@@ -18,7 +18,7 @@ function readNum(key: string, fallback: number): number {
 export function BackgroundDebug() {
   const [open, setOpen] = useState(false)
   const [blur, setBlur] = useState(() => readNum(BLUR_KEY, 2))
-  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 0))
+  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 1))
 
   useEffect(() => {
     document.documentElement.style.setProperty('--genre-bg-blur', `${blur}px`)
@@ -51,7 +51,7 @@ export function BackgroundDebug() {
             <input
               type="range"
               min={0}
-              max={0.85}
+              max={1}
               step={0.01}
               value={overlay}
               onChange={(e) => setOverlay(Number(e.target.value))}

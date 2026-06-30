@@ -145,9 +145,8 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
             )
             })}
           </motion.div>
+          {/* Dark scrim — opacity tunable via the debug panel (default 1) */}
           <div className="genre-bg-scrim" />
-          {/* Adjustable dark overlay (driven by the debug panel; default 0) */}
-          <div className="genre-bg-overlay" />
         </motion.div>
       )}
     </AnimatePresence>
