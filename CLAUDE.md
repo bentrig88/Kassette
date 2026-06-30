@@ -40,26 +40,34 @@ src/
     useDoorSFX.ts       One-shot SFX for door opening and tape inserting
   components/
     AuthScreen.tsx          Apple Music connect UI
-    CassetteCarousel.tsx    Draggable genre cassette carousel
+    CassetteCarousel.tsx    Draggable genre cassette carousel (+ "CHOOSE YOUR GENRE" title)
     CassettePlayer.tsx      Main player: VU meter, tape bay, track display, controls
     PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
+    SceneBackground.tsx     Persistent generic background + decorative objects (playback)
+    GenreBackground.tsx     Per-genre tape-selection photo + diagonal wipe + mouse parallax
   assets/
     tapes/
       cassette-body-flat.png        Flattened PNG composite of all static cassette body layers (@2x)
-      cassette2-body-flat.png       … cassette style variants (2–6)
+      cassette2-body-flat.png       … cassette style variants (2–8, one per genre)
       cassette3-body-flat.png
       cassette4-body-flat.png
       cassette5-body-flat.png
       cassette6-body-flat.png
+      cassette7-body-flat.png
+      cassette8-body-flat.png
       cassette-reel-left.svg
       cassette-reel-right.svg
       cassetteAssets.ts             Imports + genreBodyMap (genre → body PNG)
     player/
       player-*.svg / player-*.png   32 player UI assets
       playerAssets.ts
+    misc/
+      logo.svg                      Player bottom-left logo (replaces 3-stripe composite)
     background/
       background-generic.jpg
       object-generic-1/2/3.png
+      tape_back_<genre>.jpg          Per-genre tape-selection backgrounds (8)
+      genreBackgrounds.ts            genre→photo map + getWipeDirection helper
     sfx/
       SFX-rewinding-start.aac
       SFX-rewinding-loop-2.aac
@@ -381,7 +389,7 @@ export const genreBodyMap: Record<string, string> = {
   ...
 }
 ```
-**Only edit this file** to reassign styles. Currently 6 variants for 8 genres — 2 genres share a style until new variants are created.
+**Only edit this file** to reassign styles. All 8 genres now have a dedicated flattened body PNG (`cassette1`–`cassette8`): Rock→1, Hip-Hop→2, Electronic→3, Reggae→4, **Folk→5**, **Classical→6**, **Jazz→7**, **Pop→8**. (Classical/Folk were swapped; Jazz/Pop moved off shared styles onto `cassette7`/`cassette8`.)
 
 ### Door SFX (`useDoorSFX`)
 Two one-shot sounds wired into the door animation `useEffect` in `CassettePlayer`:
@@ -396,21 +404,45 @@ Redesigned `PlaylistController` to match the Figma design (`node 63:677`).
 
 ### Layout & container
 `.pf-container`: `backdrop-filter: blur(20px)`, `background: rgba(255,255,255,0.1)`, `border-radius: 36px`, `box-shadow: 0 12px 12px rgba(0,0,0,0.25)`, `padding: 20px 24px`.
-Header row: "PLAYLIST FILTERS" left + "N upcoming tracks analyzed" right — both Kode Mono Bold 20px / 10px, white.
+Header row: "PLAYLIST FILTERS" left + "N upcoming tracks analyzed" right. Title is Kode Mono; the analyzed count is **Afacad 14px, weight 400** (enlarged + lightened from the original Kode Mono 10px). Both white.
 
 ### Custom slider
 Each filter uses `.pf-slider-track` (glass pill: `rgba(255,255,255,0.17)` bg, `1px solid rgba(255,255,255,0.2)` border, `border-radius: 28px`, `padding: 4px`) containing a native `<input type="range">` styled with `appearance: none`.
-- Fill: `linear-gradient(to right, #f43c4e var(--pf-fill), rgba(255,255,255,0.12) var(--pf-fill))` — `--pf-fill` is set as an inline CSS variable from `value%`.
-- Thumb: 20px flat `#f43c4e` circle, `box-shadow: 0 0 0 1px rgba(255,255,255,0.2)`. Both `::-webkit-slider-thumb` and `::-moz-range-thumb` defined.
-- Filter label: Montserrat Black 20px. End labels (Slow/Fast etc.): Montserrat Regular 14px.
+- Fill: `linear-gradient(to right, #E20025 var(--pf-fill), rgba(255,255,255,0.12) var(--pf-fill))` — `--pf-fill` is set as an inline CSS variable from `value%`. (Brand red, matched to the Insert Tape button.)
+- Thumb: 20px flat `#E20025` circle, `box-shadow: 0 0 0 1px rgba(255,255,255,0.2)`. Both `::-webkit-slider-thumb` and `::-moz-range-thumb` defined.
+- Filter label: Afacad 700, 20px. End labels (Slow/Fast etc.): Afacad 400, 14px.
+- `.pf-filter` is a flex column with `gap: 12px` between each title and its slider.
 
-### Fonts added
-`Montserrat` (weights 400 + 900) added to the Google Fonts import in `index.html`.
+---
 
-### Nav bar
-`.app-header` updated: background matches `.pf-container` (`rgba(255,255,255,0.1)` + `blur(20px)`), border-bottom removed, `box-shadow: 0 4px 12px rgba(0,0,0,0.25)` added.
-`.app-logo`: Kode Mono Bold 20px, white, `text-transform: uppercase`.
-`.signout-btn`: Montserrat Medium (500), white text, `1px solid #fff` border.
+## Typography
+Two web fonts loaded from Google Fonts in `index.html`:
+- **Kode Mono** (400/700) — the player + LCD aesthetic ONLY: `.np-*` (LCD screen title/artist, dB numbers, player label/logo text, transport-button captions, tape-type selector). Do not change these to a sans face.
+- **Afacad** (400/500/600/700) — everything else (general UI + playlist filters): the carousel title, Insert Tape button, Sign Out button, and all `.pf-*` text. Afacad's heaviest weight is **700** (no 900).
+
+Montserrat was fully removed during the Afacad switch.
+
+---
+
+## Tape-Selection Backgrounds (Phase 3)
+Spec: `docs/superpowers/specs/2026-06-30-genre-backgrounds-design.md`. Component: `src/components/GenreBackground.tsx`; genre→photo map + `getWipeDirection` in `src/assets/background/genreBackgrounds.ts`; photos `src/assets/background/tape_back_<genre>.jpg` (note `Hip-Hop→hiphop`, `Electronic→electro`).
+
+Replaces the old blur/white carousel overlays. Behaviour:
+- Full-screen per-genre photo (z-index 20, above the player, below the carousel at 30) with a dark scrim for legibility.
+- **Diagonal directional wipe** on tape change: an incoming photo layer animates a 4-vertex `clip-path` (constant vertex count so Framer interpolates without jumps); direction from `getWipeDirection` (shortest path around the ring; wrap last→first reads "right"). `SLANT` controls the diagonal angle. Duration 0.3s.
+- **Mouse parallax**: the photo layer is scaled `PARALLAX_SCALE` (1.1) and translated up to `±MAX_SHIFT%` (3%) opposite the cursor, spring-smoothed. Scale overflow (5%) > shift (3%) so an edge can never be exposed. Scrim sits outside the parallax wrapper.
+- Fades out (0.4s) on insert, gated on `!isInserted && !isInserting`.
+- **Critical:** ref bookkeeping (`prevIndexRef`/`prevSrcRef`) lives in the effect body, NOT inside the `setLayers` updater — StrictMode double-invokes updaters in dev and would collapse every wipe to "right". Layer prune keys on the stable `layer.id`.
+
+### Tape-selection UI pass
+- **Carousel title** `.carousel-title` — "CHOOSE YOUR GENRE", centered white uppercase Afacad 700, anchored above the (vertically-centered) carousel; fades with the carousel on insert.
+- **Insert Tape button** — solid red `#E20025`, no border, Afacad 700 ~1.85rem uppercase pill.
+- **Nav arrows** `.nav-arrow` — full circles (`3.85rem`, `border-radius: 50%`), flex-centered glyphs enlarged to 3rem. The `‹`/`›` guillemets are optically re-centered via inner-edge padding on `:first-child`/`:last-child` + a 2px `padding-bottom`; `gap: 1.25rem` between them.
+- **Carousel drag fixes** — `dragMomentum={false}` so hard flicks snap deterministically; `onDragStart` stops any in-flight snap animation; cassette `<img>`s use `draggable={false}` + `-webkit-user-drag:none` to stop the native image-drag ghost.
+
+### Player logo & chrome
+- Player logo (`.np-logo`, bottom-left) is now a single `src/assets/misc/logo.svg` (`width:120px; left:17px; top:465px`), replacing the old 3-stripe (reel-icon + KASSETTE text) composite.
+- **Top nav bar removed** (`.app-header`/`.app-logo` deleted). Sign Out is now a floating `.signout-btn--floating` (`position:fixed`, top-right, `z-index:40`): bigger uppercase Afacad pill (`border-radius:9999px`) with a strong `backdrop-filter: blur(20px)` translucent fill.
 
 ---
 
