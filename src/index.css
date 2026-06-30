@@ -1112,7 +1112,7 @@ input[type='range'] {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #f43c4e;
+  background: #E20025;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
   margin-top: -1px;
   cursor: pointer;
@@ -1123,7 +1123,7 @@ input[type='range'] {
   height: 20px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  background: #f43c4e;
+  background: #E20025;
   cursor: pointer;
 }
 
