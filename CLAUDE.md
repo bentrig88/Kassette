@@ -30,9 +30,12 @@ src/
     playerStore.ts      Playback state, inserted cassette, queuedTracks, volume, quality, filter sliders
   services/
     appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
-    audioAnalysis.ts    analyzeBuffer() — raw BPM/energy/mood from a decoded preview clip
-    featureCache.ts     IndexedDB cache (kassette-features v4) for raw TrackFeatures
+    audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, centroid, chroma, KS key); runs in the worker
+    analysisClient.ts   Main-thread worker owner: resample (11kHz mono) + RPC → analyzeAudioBuffer()
+    featureCache.ts     IndexedDB cache (kassette-features v5) for raw TrackFeatures
     featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
+  workers/
+    analysis.worker.ts  Dedicated worker: runs analyzePCM off the main thread
   lib/
     mapPool.ts          Bounded-concurrency async pool (used by the analysis hooks)
   hooks/
@@ -183,12 +186,15 @@ Three sliders (Pace/Tempo, Energy, Mood) dynamically re-sort the upcoming queue 
 ### Audio Feature Extraction
 Apple Music API does **not** expose audio features to developers (400 error on the audio-features endpoint). Instead, features are extracted from **30-second preview clips** attached to each catalog song:
 1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs (300/req) and extracts `attributes.previews[0].url`
-2. `analyzeBuffer(id, buffer)` (`audioAnalysis.ts`) — runs on a decoded `AudioBuffer` and returns **RAW** measurements (no fixed 0–100 scaling):
+2. The clip is fetched + `decodeAudioData`'d on the main thread, then **resampled to mono 11.025 kHz** (`OfflineAudioContext`) and the raw PCM is **transferred to a Web Worker** (`analysisClient.ts` → `workers/analysis.worker.ts`). Downsampling cuts the sample count ~4× and is plenty for these features.
+3. `analyzePCM(id, samples, sampleRate)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) returns **RAW** measurements (no fixed 0–100 scaling):
    - **energyRaw**: linear RMS of the whole clip (loudness/intensity proxy)
-   - **moodRaw**: zero-crossing rate in Hz (brightness proxy; higher = brighter)
+   - **moodRaw**: 0–1 blend of **brightness** (mean spectral centroid via a hand-rolled radix-2 FFT) and **musical mode** (major→happier / minor→darker), where mode comes from an FFT **chroma** vector matched against **Krumhansl–Schmuckler** key profiles. Weighting: `0.6·brightness + 0.4·mode`. (Replaced the old zero-crossing-rate proxy.)
    - **bpm**: autocorrelation of an onset-strength (energy-envelope) signal, folded into 60–150
-3. Results cached in IndexedDB (`kassette-features`, **v4** — bumped when raw storage was introduced) via `featureCache.ts`
-4. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
+4. Results cached in IndexedDB (`kassette-features`, **v5** — bumped when mood became the centroid+key blend) via `featureCache.ts`
+5. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
+
+The worker is a singleton owned by `analysisClient.ts`, which correlates requests/responses by an incrementing `reqId` (promise map). The concurrency pool (below) parallelizes network + decode + resample on the main thread; the single worker serializes the heavy DSP so the UI never janks.
 
 ### Library-Relative Normalization (`featureNormalize.ts`)
 Raw measurements have no meaningful absolute 0–100 mapping — a fixed constant makes most tracks cluster in a narrow band and the sliders feel dead. Instead `buildNormalizer(featuresMap)` converts each raw value to its **percentile rank within the user's own analyzed library** → `{ pace, energy, mood }` (0 = lowest in library, 100 = highest). This self-calibrates so the sliders always span the full range. The normalizer is cheap (one sort per metric) and rebuilt as analysis fills in more tracks (memoized on `featuresMap` at call sites). With ≤1 analyzed track, all metrics return a neutral 50.
@@ -224,8 +230,9 @@ The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next)
 
 ### Known Limitations / Future Work
 - BPM accuracy is reasonable for most genres but imperfect (30s preview, energy-envelope onset detection, octave folding to 60–150). Better: spectral-flux onsets + a tempo prior.
-- Energy (RMS) and Mood (ZCR) are still crude raw proxies — only the *normalization* is improved, not the measurements. Better mood: spectral centroid + major/minor key detection. Better energy: combine loudness with spectral flux. Best overall: Essentia.js in a Web Worker.
-- The real-time `AnalyserNode` analysis path (`feedFrame`/`computeFeatures`/`useTrackAnalysis`) was dead code and has been **removed** — only the preview-clip `analyzeBuffer` path runs.
+- Mood is now brightness (spectral centroid) + major/minor mode (chroma + Krumhansl key profiles) — a real musical signal, though still a heuristic proxy for valence (no trained model). Energy is still raw RMS (could add spectral flux / loudness for a better "energy" sense).
+- Best overall future upgrade: Essentia.js in the worker (RhythmExtractor2013 for BPM+confidence, KeyExtractor, loudness) — the worker plumbing is already in place.
+- The real-time `AnalyserNode` analysis path (`feedFrame`/`computeFeatures`/`useTrackAnalysis`) was dead code and has been **removed** — only the preview-clip worker path runs.
 - Sliders reset to track values on track change, which can conflict with user-set filters if user wants persistent filtering across tracks
 - Phase 3 will redesign the full UI
 
