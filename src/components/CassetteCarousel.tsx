@@ -187,7 +187,9 @@ export function CassetteCarousel() {
               <motion.div
                 className="carousel-track"
                 drag="x"
+                dragMomentum={false}
                 style={{ x, width: totalWidth, gap: dims.gap }}
+                onDragStart={() => animControls.current?.stop()}
                 onDragEnd={() => {
                   const currentX = x.get()
                   const rawIndex = Math.round(-currentX / dims.itemWidth)
