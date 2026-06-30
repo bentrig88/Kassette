@@ -12,6 +12,7 @@ import { useMotorSFX } from '../hooks/useMotorSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
 import type { AudioQuality } from '../types/music'
 import * as A from '../assets/player/playerAssets'
+import logoUrl from '../assets/misc/logo.svg'
 import { CassetteTapeBody } from './CassetteTapeBody'
 
 // dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
@@ -408,15 +409,7 @@ export function CassettePlayer() {
       <img src={A.imgButtonsGuardElevLeft1} alt="" className="np-btn-guard-elev np-btn-guard-elev--left" />
 
       {/* ── LOGO (bottom-left) ──────────────────────────── */}
-      <div className="np-logo">
-        <div className="np-logo-stripe np-logo-stripe--red">
-          <img src={A.imgGroup10} alt="" className="np-logo-icon" />
-        </div>
-        <div className="np-logo-stripe np-logo-stripe--tan">
-          <span className="np-logo-text">KASSETTE</span>
-        </div>
-        <div className="np-logo-stripe np-logo-stripe--teal" />
-      </div>
+      <img src={logoUrl} alt="Kassette" className="np-logo" />
 
       {/* ── LEFT PANEL: dB Meter + Volume ───────────────── */}
       {/* dB meter */}
