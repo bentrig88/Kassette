@@ -3,6 +3,7 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
 import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
+import { buildNormalizer } from '../services/featureNormalize'
 import { useVUMeter } from '../hooks/useVUMeter'
 import { useAudioFilter } from '../hooks/useAudioFilter'
 import { useRewindSFX } from '../hooks/useRewindSFX'
@@ -259,20 +260,24 @@ export function CassettePlayer() {
   }, [currentCassette?.id, isInserted])
 
   const featuresMap = usePlayerStore((s) => s.featuresMap)
+  // Library-relative normalizer — rebuilt as analysis fills in more tracks.
+  const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
   usePreviewAnalysis(displayQueue)
   const currentTrack = displayQueue[currentTrackIndex]
   const currentFeatures: TrackFeatures | undefined = currentTrack ? featuresMap.get(currentTrack.id) : undefined
+  const currentNorm = currentFeatures ? normalizer.normalize(currentFeatures) : undefined
   const nextTrack = displayQueue[currentTrackIndex + 1]
 
-  // Snap sliders to current track's features on track change
+  // Snap sliders to current track's features (library-relative) on track change
   useEffect(() => {
     if (!currentTrack) return
     const f = featuresMap.get(currentTrack.id)
     if (!f) return
-    setTempoFilter(Math.round(Math.min(100, Math.max(0, ((f.bpm - 60) / 120) * 100))))
-    setEnergyFilter(f.energy)
-    setMoodFilter(f.mood)
+    const n = normalizer.normalize(f)
+    setTempoFilter(n.pace)
+    setEnergyFilter(n.energy)
+    setMoodFilter(n.mood)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTrack?.id, setTempoFilter, setEnergyFilter, setMoodFilter])
 
@@ -519,13 +524,14 @@ export function CassettePlayer() {
             )}
             {(() => {
               const nextFeatures = nextTrack ? featuresMap.get(nextTrack.id) : undefined
-              return nextFeatures ? (
+              const nextNorm = nextFeatures ? normalizer.normalize(nextFeatures) : undefined
+              return nextFeatures && nextNorm ? (
                 <div className="np-screen-meta np-screen-meta--dim">
                   <span>{nextFeatures.bpm} BPM</span>
                   <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                  <span>NRG {nextFeatures.energy}</span>
+                  <span>NRG {nextNorm.energy}</span>
                   <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                  <span>MOOD {nextFeatures.mood}</span>
+                  <span>MOOD {nextNorm.mood}</span>
                 </div>
               ) : (
                 <div className="np-screen-meta np-screen-meta--placeholder" />
@@ -554,13 +560,13 @@ export function CassettePlayer() {
             ) : (
               <div className="np-screen-idle">INSERT TAPE</div>
             )}
-            {currentFeatures ? (
+            {currentFeatures && currentNorm ? (
               <div className="np-screen-meta">
                 <span>{currentFeatures.bpm} BPM</span>
                 <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                <span>NRG {currentFeatures.energy}</span>
+                <span>NRG {currentNorm.energy}</span>
                 <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                <span>MOOD {currentFeatures.mood}</span>
+                <span>MOOD {currentNorm.mood}</span>
               </div>
             ) : (
               <div className="np-screen-meta np-screen-meta--empty">NO DATA</div>

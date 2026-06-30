@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
-import { analyzeBuffer } from '../services/audioAnalysis'
+import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures } from '../services/featureCache'
+import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
 
+// How many preview clips to fetch + decode + analyze in parallel.
+const CONCURRENCY = 6
+
 /**
- * Slowly analyzes ALL library tracks in the background — one every 1s.
- * Runs after a 10s delay so the active cassette's analysis gets priority.
+ * Analyzes ALL library tracks in the background using a bounded concurrency
+ * pool. Runs after a 10s delay so the active cassette's analysis gets priority.
  * Already-cached tracks are skipped.
  */
 export function useBackgroundAnalysis(tracks: Track[]) {
@@ -46,26 +50,23 @@ export function useBackgroundAnalysis(tracks: Track[]) {
 
       const audioCtx = new AudioContext()
 
-      for (const track of uncached) {
-        if (cancelled) break
-        // Skip if analyzed while we were fetching URLs
-        if (await getFeatures(track.id) !== null) continue
+      await mapPool(uncached, CONCURRENCY, async (track) => {
+        // Skip if analyzed while we were fetching URLs (another lane / the
+        // active-queue pass may have covered it).
+        if (await getFeatures(track.id) !== null) return
 
         const url = previewMap.get(track.id)
-        if (!url) continue
+        if (!url) return
 
         try {
           const res = await fetch(url)
-          if (!res.ok) continue
+          if (!res.ok) return
           const buf = await audioCtx.decodeAudioData(await res.arrayBuffer())
-          const features = analyzeBuffer(track.id, buf)
+          const features = await analyzeAudioBuffer(track.id, buf)
           await setFeatures(features)
           addFeatures(features)
         } catch {/* skip on CORS or decode error */}
-
-        // Gentle pace — 1s between tracks so we don't saturate the network
-        await new Promise((r) => setTimeout(r, 1_000))
-      }
+      }, () => cancelled)
 
       await audioCtx.close().catch(() => {})
     }

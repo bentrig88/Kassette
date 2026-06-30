@@ -1,211 +1,230 @@
 /**
- * Audio feature extraction from Web Audio AnalyserNode data.
+ * Pure audio feature DSP. Operates on raw mono PCM (Float32Array) so it can run
+ * inside a Web Worker, off the main thread. Returns RAW measurements; absolute
+ * 0–100 scaling happens library-relative in featureNormalize.ts.
  *
- * Energy  — RMS of time-domain signal, averaged over the analysis window
- * Mood    — Spectral centroid (brighter spectrum = higher value = happier)
- * BPM     — Sub-bass (40–120 Hz) peak detection, inter-peak interval → BPM
+ * bpm       — autocorrelation of a spectral-flux onset novelty curve, disambiguated
+ *             by a log-Gaussian tempo prior (~120 BPM), clamped to 50–200
+ * energyRaw — linear RMS of the whole clip (loudness/intensity proxy)
+ * moodRaw   — 0–1 blend of brightness (spectral centroid) and musical mode
+ *             (major → happier, minor → darker), the latter from an FFT chroma
+ *             vector matched against Krumhansl–Schmuckler key profiles.
  */
+import type { TrackFeatures } from './featureCache'
 
-export interface AnalysisState {
-  // Energy accumulation
-  energySamples: number[]
+// Krumhansl–Schmuckler key profiles (index 0 = C). Used to estimate major vs minor.
+const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
+const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
 
-  // Mood accumulation
-  moodSamples: number[]
-
-  // BPM detection
-  subBassHistory: number[]
-  peakTimestamps: number[]
-  dynamicThreshold: number
-  lastPeakTime: number
-}
-
-export function createAnalysisState(): AnalysisState {
-  return {
-    energySamples: [],
-    moodSamples: [],
-    subBassHistory: [],
-    peakTimestamps: [],
-    dynamicThreshold: 0,
-    lastPeakTime: 0,
-  }
-}
+const FFT_SIZE = 2048
+const FFT_HOP = 1024
 
 /**
- * Feed one frame of analyser data into the state.
- * Call this every ~50ms while the track is playing.
+ * In-place iterative radix-2 FFT. `re`/`im` must have a power-of-two length.
  */
-export function feedFrame(
-  state: AnalysisState,
-  analyser: AnalyserNode,
-  now: number // performance.now()
-): void {
-  const fftSize = analyser.fftSize
-  const sampleRate = analyser.context.sampleRate
-
-  // Time-domain data for energy
-  const timeData = new Float32Array(fftSize)
-  analyser.getFloatTimeDomainData(timeData)
-
-  // Frequency-domain data for mood + BPM
-  const freqData = new Float32Array(analyser.frequencyBinCount)
-  analyser.getFloatFrequencyData(freqData)
-
-  // ── Energy (RMS) ────────────────────────────────────────────
-  let rmsSum = 0
-  for (let i = 0; i < timeData.length; i++) rmsSum += timeData[i] * timeData[i]
-  state.energySamples.push(Math.sqrt(rmsSum / timeData.length))
-
-  // ── Mood (spectral centroid) ─────────────────────────────────
-  const nyquist = sampleRate / 2
-  let weightedFreq = 0
-  let totalMag = 0
-  for (let i = 0; i < freqData.length; i++) {
-    const mag = Math.pow(10, freqData[i] / 20) // dB → linear
-    const freq = (i / freqData.length) * nyquist
-    weightedFreq += freq * mag
-    totalMag += mag
-  }
-  if (totalMag > 0) state.moodSamples.push(weightedFreq / totalMag)
-
-  // ── BPM (sub-bass peak detection, 40–120 Hz) ─────────────────
-  const binSize = nyquist / freqData.length
-  const lowBin = Math.max(0, Math.floor(40 / binSize))
-  const highBin = Math.min(freqData.length - 1, Math.floor(120 / binSize))
-  let subBassEnergy = 0
-  for (let i = lowBin; i <= highBin; i++) {
-    subBassEnergy += Math.pow(10, freqData[i] / 20)
-  }
-  subBassEnergy /= highBin - lowBin + 1
-
-  state.subBassHistory.push(subBassEnergy)
-  if (state.subBassHistory.length > 20) state.subBassHistory.shift()
-
-  // Dynamic threshold: mean of recent history
-  const mean = state.subBassHistory.reduce((a, b) => a + b, 0) / state.subBassHistory.length
-  state.dynamicThreshold = mean * 1.4
-
-  // Peak detection with minimum 250ms gap between beats (max 240 BPM)
-  if (
-    subBassEnergy > state.dynamicThreshold &&
-    now - state.lastPeakTime > 250 &&
-    state.subBassHistory.length >= 5
-  ) {
-    if (state.lastPeakTime > 0) {
-      state.peakTimestamps.push(now)
-    } else {
-      state.peakTimestamps.push(now)
+function fft(re: Float32Array, im: Float32Array): void {
+  const n = re.length
+  // Bit-reversal permutation
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1
+    for (; j & bit; bit >>= 1) j ^= bit
+    j ^= bit
+    if (i < j) {
+      const tr = re[i]; re[i] = re[j]; re[j] = tr
+      const ti = im[i]; im[i] = im[j]; im[j] = ti
     }
-    state.lastPeakTime = now
   }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len
+    const wr = Math.cos(ang)
+    const wi = Math.sin(ang)
+    for (let i = 0; i < n; i += len) {
+      let cwr = 1
+      let cwi = 0
+      for (let k = 0; k < len / 2; k++) {
+        const a = i + k
+        const b = a + len / 2
+        const xr = re[b] * cwr - im[b] * cwi
+        const xi = re[b] * cwi + im[b] * cwr
+        re[b] = re[a] - xr
+        im[b] = im[a] - xi
+        re[a] += xr
+        im[a] += xi
+        const ncwr = cwr * wr - cwi * wi
+        cwi = cwr * wi + cwi * wr
+        cwr = ncwr
+      }
+    }
+  }
+}
 
-  // Keep only last 30 peaks
-  if (state.peakTimestamps.length > 30) state.peakTimestamps.shift()
+/** Pearson correlation of a 12-bin chroma vector with a key profile rotated by `rot`. */
+function keyCorrelation(chroma: number[], profile: number[], rot: number): number {
+  let mc = 0
+  let mp = 0
+  for (let i = 0; i < 12; i++) { mc += chroma[i]; mp += profile[i] }
+  mc /= 12; mp /= 12
+  let num = 0
+  let dc = 0
+  let dp = 0
+  for (let i = 0; i < 12; i++) {
+    const c = chroma[i] - mc
+    const p = profile[(i - rot + 12) % 12] - mp
+    num += c * p
+    dc += c * c
+    dp += p * p
+  }
+  const den = Math.sqrt(dc * dp)
+  return den === 0 ? 0 : num / den
 }
 
 /**
- * Analyzes a decoded AudioBuffer (e.g. from a 30s preview clip) and returns
- * BPM, energy, and mood without requiring real-time playback.
+ * Spectral features over Hann-windowed FFT frames:
+ *   - centroid: mean spectral centroid in Hz (brightness)
+ *   - mode:     +1 (major) / -1 (minor) with a 0–1 confidence, via chroma + KS profiles
  */
-export function analyzeBuffer(
-  id: string,
-  buffer: AudioBuffer
-): import('./featureCache').TrackFeatures {
-  const data = buffer.getChannelData(0)
-  const sampleRate = buffer.sampleRate
+function spectralFeatures(data: Float32Array, sampleRate: number): {
+  centroid: number
+  modeSign: number
+  modeConfidence: number
+} {
+  const re = new Float32Array(FFT_SIZE)
+  const im = new Float32Array(FFT_SIZE)
 
-  // ── Energy (RMS) ────────────────────────────────────────────
+  const hann = new Float32Array(FFT_SIZE)
+  for (let i = 0; i < FFT_SIZE; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (FFT_SIZE - 1))
+
+  // Precompute per-bin frequency and pitch class (chroma bin), once.
+  const half = FFT_SIZE / 2
+  const binFreq = new Float32Array(half)
+  const binPitch = new Int8Array(half)
+  for (let k = 0; k < half; k++) {
+    const f = (k * sampleRate) / FFT_SIZE
+    binFreq[k] = f
+    // Fold audible fundamentals 27.5 Hz (A0) .. 5 kHz into 12 pitch classes
+    binPitch[k] = f >= 27.5 && f <= 5000 ? ((Math.round(69 + 12 * Math.log2(f / 440)) % 12) + 12) % 12 : -1
+  }
+
+  const chroma = new Array(12).fill(0)
+  let centroidSum = 0
+  let frames = 0
+
+  for (let start = 0; start + FFT_SIZE <= data.length; start += FFT_HOP) {
+    for (let i = 0; i < FFT_SIZE; i++) { re[i] = data[start + i] * hann[i]; im[i] = 0 }
+    fft(re, im)
+    let num = 0
+    let den = 0
+    for (let k = 1; k < half; k++) {
+      const mag = Math.sqrt(re[k] * re[k] + im[k] * im[k])
+      num += binFreq[k] * mag
+      den += mag
+      const pc = binPitch[k]
+      if (pc >= 0) chroma[pc] += mag
+    }
+    if (den > 0) { centroidSum += num / den; frames++ }
+  }
+
+  if (frames === 0) return { centroid: 0, modeSign: 1, modeConfidence: 0 }
+
+  const centroid = centroidSum / frames
+
+  let bestMajor = -Infinity
+  let bestMinor = -Infinity
+  for (let rot = 0; rot < 12; rot++) {
+    const cMaj = keyCorrelation(chroma, MAJOR_PROFILE, rot)
+    const cMin = keyCorrelation(chroma, MINOR_PROFILE, rot)
+    if (cMaj > bestMajor) bestMajor = cMaj
+    if (cMin > bestMinor) bestMinor = cMin
+  }
+  const modeSign = bestMajor >= bestMinor ? 1 : -1
+  const modeConfidence = Math.min(1, Math.abs(bestMajor - bestMinor) * 2)
+
+  return { centroid, modeSign, modeConfidence }
+}
+
+// Perceptual tempo prior: log-Gaussian centered on 120 BPM (~1 octave spread).
+// Multiplying the autocorrelation by this resolves half/double-tempo octave
+// ambiguity in favour of the more likely musical tempo.
+function tempoPrior(bpm: number): number {
+  const x = Math.log2(bpm / 120) / 0.9
+  return Math.exp(-0.5 * x * x)
+}
+
+/**
+ * Estimate tempo from a spectral-flux onset novelty curve.
+ *
+ * Spectral flux (sum of positive bin-to-bin magnitude changes) is a far better
+ * onset detector than a time-domain RMS-envelope derivative — it fires on
+ * note/percussion onsets across the whole spectrum. The novelty curve is
+ * autocorrelated over lags spanning 50–200 BPM, each score weighted by the
+ * tempo prior, and the best lag wins (no lossy octave folding).
+ */
+function estimateTempo(data: Float32Array, sampleRate: number): number {
+  const N = 1024
+  const half = N / 2
+  const hop = Math.max(64, Math.round(sampleRate * 0.0116)) // ~11.6 ms frame rate
+  if (data.length < N + hop) return 120
+
+  const hann = new Float32Array(N)
+  for (let i = 0; i < N; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1))
+  const re = new Float32Array(N)
+  const im = new Float32Array(N)
+  const prevMag = new Float32Array(half)
+
+  const flux: number[] = []
+  for (let start = 0; start + N <= data.length; start += hop) {
+    for (let i = 0; i < N; i++) { re[i] = data[start + i] * hann[i]; im[i] = 0 }
+    fft(re, im)
+    let sum = 0
+    for (let k = 1; k < half; k++) {
+      const mag = Math.sqrt(re[k] * re[k] + im[k] * im[k])
+      const d = mag - prevMag[k]
+      if (d > 0) sum += d // half-wave rectified
+      prevMag[k] = mag
+    }
+    flux.push(sum)
+  }
+  if (flux.length < 16) return 120
+
+  // Onset envelope: subtract the global mean and half-wave rectify to sharpen peaks.
+  let mean = 0
+  for (const v of flux) mean += v
+  mean /= flux.length
+  const onset = flux.map((v) => Math.max(0, v - mean))
+
+  const fps = sampleRate / hop
+  const lagMin = Math.round((fps * 60) / 200)
+  const lagMax = Math.min(onset.length - 1, Math.round((fps * 60) / 50))
+
+  let bestScore = -Infinity
+  let bestBpm = 120
+  for (let lag = lagMin; lag <= lagMax; lag++) {
+    let corr = 0
+    for (let i = 0; i + lag < onset.length; i++) corr += onset[i] * onset[i + lag]
+    const bpm = (fps * 60) / lag
+    const score = corr * tempoPrior(bpm)
+    if (score > bestScore) { bestScore = score; bestBpm = bpm }
+  }
+  return Math.round(Math.min(200, Math.max(50, bestBpm)))
+}
+
+/**
+ * Analyzes raw mono PCM and returns raw BPM / energy / mood measurements.
+ */
+export function analyzePCM(id: string, data: Float32Array, sampleRate: number): TrackFeatures {
+  // ── Energy (raw linear RMS) ─────────────────────────────────
   let sumSq = 0
   for (let i = 0; i < data.length; i++) sumSq += data[i] * data[i]
-  const rms = Math.sqrt(sumSq / data.length)
-  const energy = Math.min(100, Math.round((rms / 0.25) * 100))
+  const energyRaw = Math.sqrt(sumSq / Math.max(1, data.length))
 
-  // ── Mood (zero-crossing rate as brightness proxy) ────────────
-  // Low ZCR = bass-heavy/dark, high ZCR = bright/energetic
-  let zeroCrossings = 0
-  for (let i = 1; i < data.length; i++) {
-    if ((data[i] >= 0) !== (data[i - 1] >= 0)) zeroCrossings++
-  }
-  const zcr = (zeroCrossings / data.length) * sampleRate
-  // Typical music range: 50 Hz (dark) → 3000 Hz (bright)
-  const mood = Math.min(100, Math.max(0, Math.round(((zcr - 50) / 2950) * 100)))
+  // ── Mood (brightness × mode blend, 0–1) ─────────────────────
+  const { centroid, modeSign, modeConfidence } = spectralFeatures(data, sampleRate)
+  const brightness = Math.min(1, Math.max(0, centroid / 4000)) // 0 dark .. 1 bright
+  const modeScore = 0.5 + 0.5 * modeSign * modeConfidence       // 0 minor .. 1 major
+  const moodRaw = 0.6 * brightness + 0.4 * modeScore            // 0..1
 
-  // ── BPM (autocorrelation of onset strength) ─────────────────
-  // Standard musicology approach: correlate the onset envelope with itself
-  // at different lags — the dominant lag is the beat period.
-  const hopSize = Math.floor(sampleRate * 0.01)    // 10ms hop
-  const frameSize = Math.floor(sampleRate * 0.023) // ~23ms frame (~1024 samples @44.1kHz)
-  const numFrames = Math.floor((data.length - frameSize) / hopSize)
+  // ── BPM (spectral-flux onsets + tempo prior) ────────────────
+  const bpm = estimateTempo(data, sampleRate)
 
-  // Energy envelope
-  const env: number[] = []
-  for (let f = 0; f < numFrames; f++) {
-    const s = f * hopSize
-    let e = 0
-    for (let i = s; i < s + frameSize; i++) e += data[i] * data[i]
-    env.push(Math.sqrt(e / frameSize))
-  }
-
-  // Onset strength: half-wave rectified first derivative
-  const onset: number[] = [0]
-  for (let i = 1; i < env.length; i++) onset.push(Math.max(0, env[i] - env[i - 1]))
-
-  // Autocorrelation over lags that correspond to 50–200 BPM
-  const framesPerSec = sampleRate / hopSize
-  const lagMin = Math.round(framesPerSec * 60 / 200) // 200 BPM
-  const lagMax = Math.round(framesPerSec * 60 / 50)  // 50 BPM
-
-  let bestLag = lagMin
-  let bestCorr = -1
-  for (let lag = lagMin; lag <= Math.min(lagMax, onset.length - 1); lag++) {
-    let corr = 0
-    for (let i = 0; i < onset.length - lag; i++) corr += onset[i] * onset[i + lag]
-    if (corr > bestCorr) { bestCorr = corr; bestLag = lag }
-  }
-
-  let bpm = Math.round((framesPerSec * 60) / bestLag)
-  // Fold into natural range 60–150
-  while (bpm > 150) bpm = Math.round(bpm / 2)
-  while (bpm < 60) bpm = bpm * 2
-
-  return { id, bpm, energy, mood, analyzedAt: Date.now() }
-}
-
-/**
- * Returns finalized features once enough data has been collected.
- * Returns null if not enough data yet.
- */
-export function computeFeatures(
-  _id: string,
-  state: AnalysisState
-): { bpm: number; energy: number; mood: number } | null {
-  // Need at least 10 peaks for BPM and 100 energy samples (~5s)
-  if (state.peakTimestamps.length < 10 || state.energySamples.length < 100) {
-    return null
-  }
-
-  // BPM from median inter-peak interval
-  const intervals: number[] = []
-  for (let i = 1; i < state.peakTimestamps.length; i++) {
-    intervals.push(state.peakTimestamps[i] - state.peakTimestamps[i - 1])
-  }
-  intervals.sort((a, b) => a - b)
-  const medianInterval = intervals[Math.floor(intervals.length / 2)]
-  let bpm = Math.round(60000 / medianInterval)
-
-  // Fold into natural range 60–150 to avoid doubling/halving artefacts
-  while (bpm > 150) bpm = Math.round(bpm / 2)
-  while (bpm < 60) bpm = bpm * 2
-
-  // Energy: mean RMS normalized to 0–100
-  // Typical RMS values for music: 0.01 (quiet) to 0.3 (loud)
-  const meanRMS = state.energySamples.reduce((a, b) => a + b, 0) / state.energySamples.length
-  const energy = Math.min(100, Math.round((meanRMS / 0.25) * 100))
-
-  // Mood: spectral centroid normalized to 0–100
-  // Typical centroid: 500 Hz (dark) to 4000 Hz (bright)
-  const meanCentroid = state.moodSamples.reduce((a, b) => a + b, 0) / state.moodSamples.length
-  const mood = Math.min(100, Math.max(0, Math.round(((meanCentroid - 500) / 3500) * 100)))
-
-  return { bpm: Math.max(40, Math.min(220, bpm)), energy, mood }
+  return { id, bpm, energyRaw, moodRaw, analyzedAt: Date.now() }
 }

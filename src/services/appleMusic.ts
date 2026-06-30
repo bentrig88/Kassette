@@ -1,5 +1,7 @@
 import { GENRES, GENRE_KEYWORDS, GENRE_COLORS } from '../types/music'
 import type { Genre, Cassette, Track } from '../types/music'
+import { buildNormalizer } from './featureNormalize'
+import type { NormalizedFeatures } from './featureNormalize'
 
 const DEVELOPER_TOKEN = import.meta.env.VITE_APPLE_MUSIC_DEVELOPER_TOKEN ?? ''
 
@@ -228,18 +230,20 @@ export function sortTracksByFilters(
   const ew = (energy - 50) / 50
   const mw = (mood - 50) / 50
 
+  // Normalize each track's raw features to its percentile rank within the library
+  // (precomputed once so the comparator stays O(1) per pair).
+  const norm = buildNormalizer(featuresMap)
+  const normCache = new Map<string, NormalizedFeatures>()
+  for (const t of analyzed) normCache.set(t.id, norm.normalize(featuresMap.get(t.id)!))
+
   analyzed.sort((a, b) => {
-    const fa = featuresMap.get(a.id)!
-    const fb = featuresMap.get(b.id)!
+    const na = normCache.get(a.id)!
+    const nb = normCache.get(b.id)!
 
-    // Normalize BPM 60–180 → 0–100
-    const bpmA = Math.min(100, Math.max(0, ((fa.bpm - 60) / 120) * 100))
-    const bpmB = Math.min(100, Math.max(0, ((fb.bpm - 60) / 120) * 100))
-
-    // Score = weighted sum; higher score → should appear later in queue
-    // When tw > 0 (want fast): high BPM gets low score → sorted first ✓
-    const scoreA = -(tw * bpmA + ew * fa.energy + mw * fa.mood)
-    const scoreB = -(tw * bpmB + ew * fb.energy + mw * fb.mood)
+    // Score = weighted sum; higher score → should appear later in queue.
+    // When tw > 0 (want fast): high pace gets low score → sorted first ✓
+    const scoreA = -(tw * na.pace + ew * na.energy + mw * na.mood)
+    const scoreB = -(tw * nb.pace + ew * nb.energy + mw * nb.mood)
 
     return scoreA - scoreB
   })
