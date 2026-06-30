@@ -223,11 +223,12 @@ input[type='range'] {
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  transition: opacity 0.15s;
+  transition: background 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .signout-btn:hover {
-  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.24);
+  transform: scale(1.06);
 }
 
 /* Floating top-right corner — replaces the removed nav bar */
@@ -697,8 +698,10 @@ input[type='range'] {
   padding-bottom: 2px;
   border: 1px solid #fff;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  transition: opacity 0.15s;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: background 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* The ‹ / › glyphs are biased toward their pointing side; pad the inner edge
@@ -707,7 +710,8 @@ input[type='range'] {
 .carousel-nav .nav-arrow:last-child { padding-right: 8px; }
 
 .nav-arrow:hover:not(:disabled) {
-  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.24);
+  transform: scale(1.06);
 }
 
 .carousel-counter {
