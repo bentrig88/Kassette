@@ -103,7 +103,6 @@ export function CassetteCarousel() {
       },
     })
   // setVirtualIndex is stable (useState setter); N is stable after library loads.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [virtualIndex, dims.itemWidth, x, N])
 
   // Snap instantly on viewport width change

@@ -46,8 +46,11 @@ function buildChain(el: HTMLMediaElement, quality: AudioQuality): Chain | null {
 export function useAudioFilter(quality: AudioQuality, isPlaying: boolean) {
   const chainRef = useRef<Chain | null>(null)
   const qualityRef = useRef(quality)
-  qualityRef.current = quality
   const analyserRef = useRef<AnalyserNode | null>(null)
+
+  // Mirror the latest quality into a ref so the delayed connect effect can read
+  // it without re-running (and rebuilding the chain) on every quality change.
+  useEffect(() => { qualityRef.current = quality }, [quality])
 
   // Keep the filter frequency in sync whenever quality changes
   useEffect(() => {
@@ -94,6 +97,5 @@ export function useAudioFilter(quality: AudioQuality, isPlaying: boolean) {
     return () => clearTimeout(timer)
   }, [isPlaying])
 
-  const filterActive = chainRef.current !== null
-  return { filterActive, analyserRef }
+  return { analyserRef }
 }

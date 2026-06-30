@@ -94,7 +94,7 @@ export default function App() {
     }
 
     loadLibrary()
-  }, [isAuthenticated, setLoading, setLoadingProgress, setError, setCassettes])
+  }, [isAuthenticated, setLoading, setLoadingProgress, setError, setCassettes, setAllTracks])
 
   if (!isAuthenticated) {
     return <AuthScreen />

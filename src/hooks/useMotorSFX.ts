@@ -60,7 +60,6 @@ export function useMotorSFX(isPlaying: boolean) {
 
     load()
     return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -70,7 +69,6 @@ export function useMotorSFX(isPlaying: boolean) {
     } else {
       stopSource()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying])
 
   // Clean up on unmount
@@ -80,6 +78,5 @@ export function useMotorSFX(isPlaying: boolean) {
       ctxRef.current?.close()
       ctxRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 }

@@ -14,7 +14,10 @@ export function usePreviewAnalysis(tracks: Track[]) {
   const addFeatures = usePlayerStore((s) => s.addFeatures)
   const runningRef = useRef(false)
   const tracksRef = useRef(tracks)
-  tracksRef.current = tracks
+
+  // Mirror the latest tracks into a ref so the long-running analysis loop can
+  // read the current queue without restarting.
+  useEffect(() => { tracksRef.current = tracks }, [tracks])
 
   useEffect(() => {
     if (tracks.length === 0 || runningRef.current) return
