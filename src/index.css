@@ -1246,6 +1246,7 @@ input[type='range'] {
   font-size: 14px;
   color: #fff;
   white-space: nowrap;
+  margin-top: -6px;
 }
 
 /* ─── Player + filter wrapper — fixed centered ───────────── */
