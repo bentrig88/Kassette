@@ -373,7 +373,7 @@ input[type='range'] {
 /* Header stack above the tapes: small label + big focused-genre name */
 .carousel-header {
   position: absolute;
-  bottom: calc(100% + 48px);
+  bottom: calc(100% + 58px);
   left: 0;
   width: 100%;
   display: flex;
@@ -396,7 +396,7 @@ input[type='range'] {
 .carousel-genre {
   font-family: 'Afacad', sans-serif;
   font-weight: 700;
-  font-size: 5rem;
+  font-size: 6rem;
   line-height: 1;
   letter-spacing: 0.01em;
   text-transform: uppercase;
