@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { useMusicStore } from '../store/musicStore'
 import { usePlayerStore } from '../store/playerStore'
 import { backgroundForGenre, getWipeDirection } from '../assets/background/genreBackgrounds'
@@ -15,8 +15,14 @@ interface Layer {
   direction: WipeDir
 }
 
-// Slant of the diagonal seam, as a percentage of width.
-const SLANT = 18
+// Slant of the diagonal seam, as a percentage of width. Higher = steeper diagonal.
+const SLANT = 35
+
+// Mouse parallax. The photo layer is scaled up by PARALLAX_SCALE so the
+// ±MAX_SHIFT% translation can never expose an edge: the scale overflows each
+// side by (PARALLAX_SCALE - 1) / 2 (= 5%), which must exceed MAX_SHIFT (= 3%).
+const MAX_SHIFT = 3
+const PARALLAX_SCALE = 1.1
 
 // clip-path polygon for the incoming photo. Each polygon has 4 vertices so
 // Framer can interpolate start → end vertex-by-vertex, sweeping the seam.
@@ -77,6 +83,24 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
     setLayers((cur) => [...cur, { id, src, direction }])
   }, [src, selectedIndex, n])
 
+  // Subtle mouse parallax, smoothed with a spring. Background drifts opposite
+  // to the cursor for a sense of depth.
+  const mvX = useMotionValue(0)
+  const mvY = useMotionValue(0)
+  const springX = useSpring(mvX, { stiffness: 60, damping: 20, mass: 0.5 })
+  const springY = useSpring(mvY, { stiffness: 60, damping: 20, mass: 0.5 })
+  const shiftX = useTransform(springX, [-1, 1], [`${MAX_SHIFT}%`, `${-MAX_SHIFT}%`])
+  const shiftY = useTransform(springY, [-1, 1], [`${MAX_SHIFT}%`, `${-MAX_SHIFT}%`])
+
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      mvX.set((e.clientX / window.innerWidth) * 2 - 1)
+      mvY.set((e.clientY / window.innerHeight) * 2 - 1)
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [mvX, mvY])
+
   const visible = !isInserted && !isInserting
 
   return (
@@ -90,7 +114,11 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4 }}
         >
-          {layers.map((layer, i) => {
+          <motion.div
+            className="genre-bg-parallax"
+            style={{ x: shiftX, y: shiftY, scale: PARALLAX_SCALE }}
+          >
+            {layers.map((layer, i) => {
             const isTop = i === layers.length - 1
             const wipes = isTop && layer.direction !== 'none'
             return (
@@ -115,7 +143,8 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
                 }}
               />
             )
-          })}
+            })}
+          </motion.div>
           <div className="genre-bg-scrim" />
         </motion.div>
       )}
