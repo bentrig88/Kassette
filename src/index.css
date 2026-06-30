@@ -1282,8 +1282,8 @@ input[type='range'] {
 .np-logo {
   position: absolute;
   left: 17px;
-  top: 460px;
-  width: 92px;
+  top: 480px;
+  width: 120px;
   height: auto;
   z-index: 4;
 }
