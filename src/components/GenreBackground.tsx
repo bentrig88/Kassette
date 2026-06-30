@@ -45,26 +45,36 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
   const src = genre ? backgroundForGenre(genre) : null
 
   const prevIndexRef = useRef(selectedIndex)
+  const prevSrcRef = useRef<string | null>(null)
   const idRef = useRef(0)
   const [layers, setLayers] = useState<Layer[]>([])
 
   // Seed the first layer, and push an incoming wipe layer on each genre change.
+  // Ref bookkeeping lives in the effect body, NOT inside a setLayers updater:
+  // StrictMode double-invokes updaters in dev, which would advance prevIndexRef
+  // before the direction is computed and collapse every wipe to 'right'.
   useEffect(() => {
     if (!src || n === 0) return
-    setLayers((prev) => {
-      if (prev.length === 0) {
-        prevIndexRef.current = selectedIndex
-        return [{ id: ++idRef.current, src, direction: 'none' }]
-      }
-      // Same genre (e.g. two genres share a photo) → no new layer.
-      if (prev[prev.length - 1].src === src) {
-        prevIndexRef.current = selectedIndex
-        return prev
-      }
-      const direction = getWipeDirection(prevIndexRef.current, selectedIndex, n)
+
+    // First layer — appears without a wipe.
+    if (prevSrcRef.current === null) {
+      prevSrcRef.current = src
       prevIndexRef.current = selectedIndex
-      return [...prev, { id: ++idRef.current, src, direction }]
-    })
+      setLayers([{ id: ++idRef.current, src, direction: 'none' }])
+      return
+    }
+
+    // Same photo (two genres can share one) → no wipe; keep prev index current.
+    if (prevSrcRef.current === src) {
+      prevIndexRef.current = selectedIndex
+      return
+    }
+
+    const direction = getWipeDirection(prevIndexRef.current, selectedIndex, n)
+    prevIndexRef.current = selectedIndex
+    prevSrcRef.current = src
+    const id = ++idRef.current
+    setLayers((cur) => [...cur, { id, src, direction }])
   }, [src, selectedIndex, n])
 
   const visible = !isInserted && !isInserting
@@ -91,7 +101,7 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
                 className="genre-bg-photo"
                 initial={wipes ? { clipPath: clipPath(layer.direction, 'start') } : false}
                 animate={{ clipPath: clipPath(layer.direction, 'end') }}
-                transition={{ duration: 0.5, ease: [0, 0, 0.58, 1] }}
+                transition={{ duration: 0.3, ease: [0, 0, 0.58, 1] }}
                 onAnimationComplete={() => {
                   // Once THIS layer is the current top and has finished wiping in,
                   // drop the now-hidden layers beneath it. Keyed on the stable
