@@ -52,17 +52,13 @@ export function PlaylistController() {
   // Selected subgenres; empty = "All" (no subgenre restriction).
   const [subgenres, setSubgenres] = useState<string[]>([])
 
-  // Distinct subgenres present in the actual queue pool (baseQueue is capped at
-  // 100 tracks by loadCassetteQueue). Deriving options from the SAME pool used
-  // for filtering guarantees every listed subgenre has matching tracks — building
-  // from currentCassette.tracks (the full set) would list subgenres that exist
-  // only beyond the 100-track slice, which then filter to an empty queue.
+  // All distinct subgenres in the cassette. Selecting one filters across the
+  // FULL track set (see applyAll), so listing the full set here is correct.
   const subgenreOptions = useMemo(() => {
     const set = new Set<string>()
-    const src = baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? [])
-    for (const t of src) for (const g of t.genreNames) set.add(g)
+    for (const t of currentCassette?.tracks ?? []) for (const g of t.genreNames) set.add(g)
     return [...set].sort((a, b) => a.localeCompare(b))
-  }, [baseQueue, currentCassette])
+  }, [currentCassette])
 
   // Reset to All whenever a new cassette is inserted (adjust-state-on-change
   // pattern — runs during render, no effect).
@@ -79,11 +75,18 @@ export function PlaylistController() {
   const applyAll = useCallback(
     (tempo: number, energy: number, mood: number, subs: string[]) => {
       if (!isInserted) return
-      const pool = baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? [])
-      if (pool.length === 0) return
 
       const played = queuedTracks.slice(0, currentTrackIndex + 1)
       const playedIds = new Set(played.map((t) => t.id))
+
+      // Subgenre filter searches the FULL cassette (so niche subgenres beyond the
+      // shuffled 100-track queue still surface their tracks). "All" uses the fresh
+      // 100-track baseQueue to preserve the per-insert shuffle.
+      const pool = subs.length > 0
+        ? (currentCassette?.tracks ?? [])
+        : (baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? []))
+      if (pool.length === 0) return
+
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
       const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood)
