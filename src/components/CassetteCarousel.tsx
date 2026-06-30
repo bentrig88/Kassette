@@ -29,6 +29,7 @@ export function CassetteCarousel() {
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const insertCassette = usePlayerStore((s) => s.insertCassette)
   const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
+  const setBaseQueue = usePlayerStore((s) => s.setBaseQueue)
   const setInsertSourceRect = usePlayerStore((s) => s.setInsertSourceRect)
 
   const [isInserting, setIsInserting] = useState(false)
@@ -156,6 +157,7 @@ export function CassetteCarousel() {
     // React 18 batches these into one render
     insertCassette(cassette)
     setQueuedTracks(shuffled)
+    setBaseQueue(shuffled) // keep the full shuffled queue for subgenre re-filtering
   }
 
   if (cassettes.length === 0) return null

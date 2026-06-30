@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { sortTracksByFilters } from '../services/appleMusic'
 
@@ -45,35 +45,63 @@ export function PlaylistController() {
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
   const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
+  const baseQueue = usePlayerStore((s) => s.baseQueue)
   const isInserted = usePlayerStore((s) => s.isInserted)
 
-  const applyFilters = useCallback(
-    (tempo: number, energy: number, mood: number) => {
-      if (!isInserted) return
-      const tracks = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
-      if (tracks.length === 0) return
+  const [subgenre, setSubgenre] = useState('All')
 
-      const played = tracks.slice(0, currentTrackIndex + 1)
-      const upcoming = tracks.slice(currentTrackIndex + 1)
-      const sortedUpcoming = sortTracksByFilters(upcoming, featuresMap, tempo, energy, mood)
+  // Distinct subgenres present in the inserted cassette's tracks, "All" first.
+  const subgenres = useMemo(() => {
+    const set = new Set<string>()
+    for (const t of currentCassette?.tracks ?? []) for (const g of t.genreNames) set.add(g)
+    return ['All', ...[...set].sort((a, b) => a.localeCompare(b))]
+  }, [currentCassette])
+
+  // Reset to All whenever a new cassette is inserted (adjust-state-on-change
+  // pattern — runs during render, no effect).
+  const [seenCassetteId, setSeenCassetteId] = useState(currentCassette?.id)
+  if (currentCassette?.id !== seenCassetteId) {
+    setSeenCassetteId(currentCassette?.id)
+    setSubgenre('All')
+  }
+
+  // Rebuild the upcoming queue from the full base queue (minus already-played),
+  // optionally restricted to a subgenre, then sorted by the sliders. Basing on
+  // baseQueue (not the current, possibly-filtered queue) lets "All" restore.
+  const applyAll = useCallback(
+    (tempo: number, energy: number, mood: number, sub: string) => {
+      if (!isInserted) return
+      const pool = baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? [])
+      if (pool.length === 0) return
+
+      const played = queuedTracks.slice(0, currentTrackIndex + 1)
+      const playedIds = new Set(played.map((t) => t.id))
+      let candidates = pool.filter((t) => !playedIds.has(t.id))
+      if (sub !== 'All') candidates = candidates.filter((t) => t.genreNames.includes(sub))
+      const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood)
       setQueuedTracks([...played, ...sortedUpcoming])
     },
-    [isInserted, queuedTracks, currentCassette, currentTrackIndex, featuresMap, setQueuedTracks]
+    [isInserted, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, setQueuedTracks]
   )
 
   function handleTempo(v: number) {
     setTempoFilter(v)
-    applyFilters(v, energyFilter, moodFilter)
+    applyAll(v, energyFilter, moodFilter, subgenre)
   }
 
   function handleEnergy(v: number) {
     setEnergyFilter(v)
-    applyFilters(tempoFilter, v, moodFilter)
+    applyAll(tempoFilter, v, moodFilter, subgenre)
   }
 
   function handleMood(v: number) {
     setMoodFilter(v)
-    applyFilters(tempoFilter, energyFilter, v)
+    applyAll(tempoFilter, energyFilter, v, subgenre)
+  }
+
+  function handleSubgenre(sub: string) {
+    setSubgenre(sub)
+    applyAll(tempoFilter, energyFilter, moodFilter, sub)
   }
 
   const upcoming = (queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? []))
@@ -85,12 +113,25 @@ export function PlaylistController() {
   return (
     <div className="pf-container">
       <div className="pf-header">
-        <span className="pf-title">PLAYLIST FILTERS</span>
-        <span className="pf-analyzed">
-          {isInserted && (!enoughData
-            ? `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`
-            : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
-        </span>
+        <div className="pf-header-titles">
+          <span className="pf-title">MIXTAPE FILTERS</span>
+          <span className="pf-analyzed">
+            {isInserted && (!enoughData
+              ? `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`
+              : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
+          </span>
+        </div>
+        <select
+          className="pf-subgenre"
+          value={subgenre}
+          onChange={(e) => handleSubgenre(e.target.value)}
+          disabled={!isInserted}
+          aria-label="Subgenre filter"
+        >
+          {subgenres.map((g) => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+        </select>
       </div>
       <div className={`pf-sliders${disabled ? ' pf-sliders--disabled' : ''}`}>
         <Slider label="Pace" leftLabel="Slow" rightLabel="Fast" value={tempoFilter} onChange={disabled ? () => {} : handleTempo} />

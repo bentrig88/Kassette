@@ -5,6 +5,7 @@ import type { TrackFeatures } from '../services/featureCache'
 interface PlayerState {
   currentCassette: Cassette | null
   queuedTracks: Track[]
+  baseQueue: Track[]      // full shuffled queue at insert — source for subgenre re-filtering
   isInserted: boolean
   playbackState: PlaybackState
   volume: number
@@ -27,6 +28,7 @@ interface PlayerState {
 
   insertCassette: (cassette: Cassette) => void
   setQueuedTracks: (tracks: Track[]) => void
+  setBaseQueue: (tracks: Track[]) => void
   ejectCassette: () => void
   setPlaybackState: (state: PlaybackState) => void
   setVolume: (volume: number) => void
@@ -48,6 +50,7 @@ function isActive(tempo: number, energy: number, mood: number) {
 export const usePlayerStore = create<PlayerState>((set) => ({
   currentCassette: null,
   queuedTracks: [],
+  baseQueue: [],
   isInserted: false,
   playbackState: 'stopped',
   volume: 0.8,
@@ -68,12 +71,13 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setInsertSourceRect: (rect) => set({ insertSourceRect: rect }),
 
   insertCassette: (cassette) =>
-    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [] }),
+    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [] }),
 
   setQueuedTracks: (tracks) => set({ queuedTracks: tracks }),
+  setBaseQueue: (tracks) => set({ baseQueue: tracks }),
 
   ejectCassette: () =>
-    set({ currentCassette: null, queuedTracks: [], isInserted: false, playbackState: 'stopped', currentTime: 0, duration: 0 }),
+    set({ currentCassette: null, queuedTracks: [], baseQueue: [], isInserted: false, playbackState: 'stopped', currentTime: 0, duration: 0 }),
 
   setPlaybackState: (state) => set({ playbackState: state }),
   setVolume: (volume) => set({ volume }),
