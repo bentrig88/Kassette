@@ -1098,7 +1098,7 @@ input[type='range'] {
   height: 7px;
   background: linear-gradient(
     to right,
-    #f43c4e var(--pf-fill, 50%),
+    #E20025 var(--pf-fill, 50%),
     rgba(255, 255, 255, 0.12) var(--pf-fill, 50%)
   );
   border-radius: 36px;
