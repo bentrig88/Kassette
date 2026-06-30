@@ -282,6 +282,8 @@ input[type='range'] {
   height: 100%;
   object-fit: cover;
   object-position: center;
+  /* Really subtle softening — bump/drop this to taste, or remove to disable */
+  filter: blur(2px);
 }
 
 /* Subtle dark scrim so white cassettes + Insert Tape button stay legible */
