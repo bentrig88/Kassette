@@ -9,6 +9,7 @@ import _imgBody3Flat from './cassette3-body-flat.png'
 import _imgBody4Flat from './cassette4-body-flat.png'
 import _imgBody5Flat from './cassette5-body-flat.png'
 import _imgBody6Flat from './cassette6-body-flat.png'
+import _imgBody7Flat from './cassette7-body-flat.png'
 
 export const imgLeftReelTape = _imgLeftReelTape
 export const imgRightReelTape = _imgRightReelTape
@@ -22,6 +23,6 @@ export const genreBodyMap: Record<string, string> = {
   'Reggae':     _imgBody4Flat,
   'Classical':  _imgBody5Flat,
   'Folk':       _imgBody6Flat,
-  'Jazz':       _imgBody3Flat,  // reuse Electronic — reassign when ready
+  'Jazz':       _imgBody7Flat,
   'Pop':        _imgBody5Flat,  // reuse Classical  — reassign when ready
 }
