@@ -1139,9 +1139,9 @@ input[type='range'] {
 
 .pf-header {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  white-space: nowrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
 .pf-title {
@@ -1154,9 +1154,9 @@ input[type='range'] {
 .pf-analyzed {
   font-family: 'Afacad', sans-serif;
   font-weight: 400;
-  font-size: 14px;
-  color: #fff;
-  text-align: right;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  text-align: left;
   min-height: 1em;
 }
 
