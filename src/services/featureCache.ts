@@ -5,15 +5,15 @@
 
 export interface TrackFeatures {
   id: string
-  bpm: number      // beats per minute (raw)
-  energy: number   // 0–100
-  mood: number     // 0–100 (0 = dark/sad, 100 = bright/happy)
+  bpm: number        // actual detected beats per minute (folded into 60–150)
+  energyRaw: number  // raw linear RMS — normalized library-relative on read
+  moodRaw: number    // raw zero-crossing rate (Hz) — normalized library-relative on read
   analyzedAt: number
 }
 
 const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
-const VERSION = 3 // bumped to clear bad BPM values — now using autocorrelation
+const VERSION = 4 // bumped: now stores RAW energy/mood (was pre-normalized) — see featureNormalize.ts
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {

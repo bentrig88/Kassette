@@ -3,11 +3,15 @@ import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeBuffer } from '../services/audioAnalysis'
 import { getFeatures, setFeatures } from '../services/featureCache'
+import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
 
+// How many preview clips to fetch + decode + analyze in parallel.
+const CONCURRENCY = 6
+
 /**
- * Analyzes tracks using their 30s Apple Music preview clips.
- * Runs in the background after the cassette queue is loaded.
+ * Analyzes the active queue's tracks using their 30s Apple Music preview clips,
+ * with a bounded concurrency pool. Runs as soon as a cassette is inserted.
  * Results are cached in IndexedDB so each track is only analyzed once.
  */
 export function usePreviewAnalysis(tracks: Track[]) {
@@ -22,6 +26,7 @@ export function usePreviewAnalysis(tracks: Track[]) {
   useEffect(() => {
     if (tracks.length === 0 || runningRef.current) return
     runningRef.current = true
+    let cancelled = false
 
     async function run() {
       const queue = tracksRef.current
@@ -31,7 +36,7 @@ export function usePreviewAnalysis(tracks: Track[]) {
         await Promise.all(queue.map(async (t) => ((await getFeatures(t.id)) ? null : t)))
       ).filter((t): t is Track => t !== null)
 
-      if (uncached.length === 0) {
+      if (cancelled || uncached.length === 0) {
         runningRef.current = false
         return
       }
@@ -41,31 +46,28 @@ export function usePreviewAnalysis(tracks: Track[]) {
 
       const audioCtx = new AudioContext()
 
-      for (const track of uncached) {
+      await mapPool(uncached, CONCURRENCY, async (track) => {
         const url = previewMap.get(track.id)
-        if (!url) continue
+        if (!url) return
 
         try {
           const res = await fetch(url)
-          if (!res.ok) continue
+          if (!res.ok) return
           const arrayBuffer = await res.arrayBuffer()
           const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
           const features = analyzeBuffer(track.id, audioBuffer)
           await setFeatures(features)
           addFeatures(features)
-          console.log(`[Kassette] analyzed "${track.name}": BPM=${features.bpm} energy=${features.energy} mood=${features.mood}`)
         } catch {
           // CORS or decode error — skip this track
         }
+      }, () => cancelled)
 
-        // Small pause between tracks to avoid saturating the network
-        await new Promise((r) => setTimeout(r, 100))
-      }
-
-      await audioCtx.close()
+      await audioCtx.close().catch(() => {})
       runningRef.current = false
     }
 
     run()
+    return () => { cancelled = true }
   }, [tracks, addFeatures])
 }
