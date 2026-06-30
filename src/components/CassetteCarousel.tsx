@@ -181,13 +181,22 @@ export function CassetteCarousel() {
             exit={{ opacity: 0, transition: { duration: 0 } }}
             transition={{ duration: 0.3 }}
           >
-            <motion.h2
-              className="carousel-title"
+            <motion.div
+              className="carousel-header"
               animate={{ opacity: isInserting ? 0 : 1 }}
               transition={{ duration: 0.3 }}
             >
-              Choose your genre
-            </motion.h2>
+              <span className="carousel-title">Choose your genre</span>
+              <motion.span
+                key={selectedCassette?.genre}
+                className="carousel-genre"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                {selectedCassette?.genre}
+              </motion.span>
+            </motion.div>
             <div
               className="carousel-track-container"
               style={{ padding: `0 calc(50% - ${dims.width / 2}px)` }}
