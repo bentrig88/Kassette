@@ -7,6 +7,7 @@ import { loadCassetteQueue } from '../services/appleMusic'
 import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import type { Cassette } from '../types/music'
 import { CassetteTapeBody } from './CassetteTapeBody'
+import { BackgroundDebug } from './BackgroundDebug'
 import { GenreBackground } from './GenreBackground'
 
 const BASE_CASSETTE_GAP = 100
@@ -168,6 +169,7 @@ export function CassetteCarousel() {
   return (
     <>
       <GenreBackground isInserting={isInserting} />
+      {!isInserted && <BackgroundDebug />}
 
       <AnimatePresence>
         {!isInserted && (
