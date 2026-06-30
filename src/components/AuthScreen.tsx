@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
-import { useMusicStore } from '../store/musicStore'
 
 export function AuthScreen() {
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const setAuthenticated = useMusicStore((s) => s.setAuthenticated)
 
   async function handleConnect() {
     setConnecting(true)
@@ -13,11 +11,16 @@ export function AuthScreen() {
     try {
       await configureMusicKit()
       await authorize()
-      setAuthenticated(true)
+      // In the session where the user *just* authorized, MusicKit's api pipeline
+      // does not attach the Music User Token to /v1/me/library/* requests, so an
+      // immediate library fetch 403s (re-authorizing in-session doesn't help —
+      // only a fresh page load does). authorize() has already persisted the
+      // token, so reload to restore the session via the known-good path:
+      // configure() → isAuthorized() → loadLibrary() with the token present.
+      window.location.reload()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Connection failed'
       setError(msg)
-    } finally {
       setConnecting(false)
     }
   }
