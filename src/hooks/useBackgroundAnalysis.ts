@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
-import { analyzeBuffer } from '../services/audioAnalysis'
+import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures } from '../services/featureCache'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
@@ -62,7 +62,7 @@ export function useBackgroundAnalysis(tracks: Track[]) {
           const res = await fetch(url)
           if (!res.ok) return
           const buf = await audioCtx.decodeAudioData(await res.arrayBuffer())
-          const features = analyzeBuffer(track.id, buf)
+          const features = await analyzeAudioBuffer(track.id, buf)
           await setFeatures(features)
           addFeatures(features)
         } catch {/* skip on CORS or decode error */}

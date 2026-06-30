@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
-import { analyzeBuffer } from '../services/audioAnalysis'
+import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures } from '../services/featureCache'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
@@ -55,7 +55,7 @@ export function usePreviewAnalysis(tracks: Track[]) {
           if (!res.ok) return
           const arrayBuffer = await res.arrayBuffer()
           const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
-          const features = analyzeBuffer(track.id, audioBuffer)
+          const features = await analyzeAudioBuffer(track.id, audioBuffer)
           await setFeatures(features)
           addFeatures(features)
         } catch {

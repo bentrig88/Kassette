@@ -13,7 +13,7 @@ export interface TrackFeatures {
 
 const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
-const VERSION = 4 // bumped: now stores RAW energy/mood (was pre-normalized) — see featureNormalize.ts
+const VERSION = 5 // bumped: moodRaw is now a centroid+key blend (was ZCR) — re-analyze
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
