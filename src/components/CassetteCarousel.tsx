@@ -223,7 +223,6 @@ export function CassetteCarousel() {
                       cassette={cassette}
                       isSelected={i === virtualIndex}
                       isInserted={isMiddle && isInserted && currentCassette?.id === cassette.id}
-                      isMiddle={isMiddle}
                       width={dims.width}
                       isInserting={isInserting}
                       selectedCassetteId={selectedCassette?.id}
@@ -278,7 +277,6 @@ interface CassetteItemProps {
   cassette: Cassette
   isSelected: boolean
   isInserted: boolean
-  isMiddle: boolean
   width: number
   isInserting: boolean
   selectedCassetteId: string | undefined
@@ -286,7 +284,7 @@ interface CassetteItemProps {
   isInsertTarget: boolean
 }
 
-function CassetteItem({ cassette, isSelected, isInserted, isMiddle, width, isInserting, selectedCassetteId, liftY, isInsertTarget }: CassetteItemProps) {
+function CassetteItem({ cassette, isSelected, isInserted, width, isInserting, selectedCassetteId, liftY, isInsertTarget }: CassetteItemProps) {
   const h = stableHash(cassette.id)
 
   // Independent per-cassette keyframe targets for x, y, rotate

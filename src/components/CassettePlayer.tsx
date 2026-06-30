@@ -30,9 +30,6 @@ const DB_TICKS = [
   { label: '-20', y: 286 },
 ]
 
-// Volume track tick y offsets relative to vol track top (player y=45)
-const VOL_TICK_Y = [0, 30, 62, 94, 126, 146, 178, 210, 242, 259]
-
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
@@ -595,11 +592,11 @@ export function CassettePlayer() {
         <button
           className="np-btn"
           disabled={!isInserted || !isPlaying}
-          onMouseDown={(e) => { playReg(); setPressedBtn('rewind'); startFB(e) }}
-          onMouseUp={(e) => { setPressedBtn(null); stopFB(e) }}
-          onMouseLeave={(e) => { setPressedBtn(null); stopFB(e) }}
-          onTouchStart={(e) => { setPressedBtn('rewind'); startFB(e) }}
-          onTouchEnd={(e) => { setPressedBtn(null); stopFB(e) }}
+          onMouseDown={() => { playReg(); setPressedBtn('rewind'); startFB() }}
+          onMouseUp={() => { setPressedBtn(null); stopFB() }}
+          onMouseLeave={() => { setPressedBtn(null); stopFB() }}
+          onTouchStart={() => { setPressedBtn('rewind'); startFB() }}
+          onTouchEnd={() => { setPressedBtn(null); stopFB() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'rewind' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
@@ -648,11 +645,11 @@ export function CassettePlayer() {
         <button
           className="np-btn"
           disabled={!isInserted || !isPlaying}
-          onMouseDown={(e) => { playReg(); setPressedBtn('ff'); startFF(e) }}
-          onMouseUp={(e) => { setPressedBtn(null); stopFF(e) }}
-          onMouseLeave={(e) => { setPressedBtn(null); stopFF(e) }}
-          onTouchStart={(e) => { setPressedBtn('ff'); startFF(e) }}
-          onTouchEnd={(e) => { setPressedBtn(null); stopFF(e) }}
+          onMouseDown={() => { playReg(); setPressedBtn('ff'); startFF() }}
+          onMouseUp={() => { setPressedBtn(null); stopFF() }}
+          onMouseLeave={() => { setPressedBtn(null); stopFF() }}
+          onTouchStart={() => { setPressedBtn('ff'); startFF() }}
+          onTouchEnd={() => { setPressedBtn(null); stopFF() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'ff' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>

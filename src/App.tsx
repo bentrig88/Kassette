@@ -42,7 +42,6 @@ export default function App() {
   const setAllTracks = useMusicStore((s) => s.setAllTracks)
   const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
-  const isInserted = usePlayerStore((s) => s.isInserted)
 
   useBackgroundAnalysis(allTracks)
   const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
