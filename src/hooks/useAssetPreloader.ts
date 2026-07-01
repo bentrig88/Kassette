@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as PlayerAssets from '../assets/player/playerAssets'
 import * as CassetteAssets from '../assets/tapes/cassetteAssets'
 import { genreBackgroundMap } from '../assets/background/genreBackgrounds'
@@ -33,17 +33,18 @@ const SAFETY_MS = 15000
 export function useAssetPreloader(): { progress: number; done: boolean } {
   const [loaded, setLoaded] = useState(0)
   const [done, setDone] = useState(false)
-  const totalRef = useRef(0)
+
+  const urls = useMemo(() => Array.from(new Set([
+    ...collectUrls(PlayerAssets as Record<string, unknown>),
+    ...collectUrls(CassetteAssets as Record<string, unknown>),
+    ...Object.values(genreBackgroundMap),
+    cassette0, bgGeneric, obj1, obj2, obj3, authBg, logoUrl,
+  ].filter((u): u is string => typeof u === 'string' && u.length > 0))), [])
+
+  const total = urls.length
 
   useEffect(() => {
-    const urls = Array.from(new Set([
-      ...collectUrls(PlayerAssets as Record<string, unknown>),
-      ...collectUrls(CassetteAssets as Record<string, unknown>),
-      ...Object.values(genreBackgroundMap),
-      cassette0, bgGeneric, obj1, obj2, obj3, authBg, logoUrl,
-    ].filter((u): u is string => typeof u === 'string' && u.length > 0)))
-
-    totalRef.current = urls.length
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (urls.length === 0) { setDone(true); return }
 
     let settled = 0
@@ -62,10 +63,8 @@ export function useAssetPreloader(): { progress: number; done: boolean } {
     }
     const safety = setTimeout(() => { if (!cancelled) setDone(true) }, SAFETY_MS)
     return () => { cancelled = true; clearTimeout(safety) }
-  }, [])
+  }, [urls])
 
-  // eslint-disable-next-line react-hooks/refs
-  const total = totalRef.current
   const progress = done ? 1 : (total > 0 ? loaded / total : 0)
   return { progress, done }
 }
