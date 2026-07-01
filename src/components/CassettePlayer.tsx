@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react'
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { usePlayerStore } from '../store/playerStore'
-import type { TrackFeatures } from '../services/featureCache'
 import { getMusicKitInstance, playQueueFrom } from '../services/appleMusic'
 import { buildNormalizer } from '../services/featureNormalize'
 import { useVUMeter } from '../hooks/useVUMeter'
@@ -15,7 +14,7 @@ import type { AudioQuality } from '../types/music'
 import * as A from '../assets/player/playerAssets'
 import logoUrl from '../assets/misc/logo.svg'
 import { CassetteTapeBody } from './CassetteTapeBody'
-import { TrackScreen } from './TrackScreen'
+import { TrackDisplay } from './TrackDisplay'
 
 // dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
 const DB_TICKS = [
@@ -256,22 +255,18 @@ export function CassettePlayer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCassette?.id, isInserted])
 
-  const featuresMap = usePlayerStore((s) => s.featuresMap)
-  // Library-relative normalizer — rebuilt as analysis fills in more tracks.
-  const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
   usePreviewAnalysis(displayQueue)
   const currentTrack = displayQueue[currentTrackIndex]
-  const currentFeatures: TrackFeatures | undefined = currentTrack ? featuresMap.get(currentTrack.id) : undefined
-  const currentNorm = currentFeatures ? normalizer.normalize(currentFeatures) : undefined
   const nextTrack = displayQueue[currentTrackIndex + 1]
 
   // Snap sliders to current track's features (library-relative) on track change
   useEffect(() => {
     if (!currentTrack) return
-    const f = featuresMap.get(currentTrack.id)
+    const fm = usePlayerStore.getState().featuresMap
+    const f = fm.get(currentTrack.id)
     if (!f) return
-    const n = normalizer.normalize(f)
+    const n = buildNormalizer(fm).normalize(f)
     setTempoFilter(n.pace)
     setEnergyFilter(n.energy)
     setMoodFilter(n.mood)
@@ -502,25 +497,13 @@ export function CassettePlayer() {
       </div>
 
       {/* ── Screen ───────────────────────────────────────── */}
-      {(() => {
-        const nextFeatures = nextTrack ? featuresMap.get(nextTrack.id) : undefined
-        const nextNorm = nextFeatures ? normalizer.normalize(nextFeatures) : undefined
-        return (
-          <TrackScreen
-            now={currentTrack ? { name: currentTrack.name, artistName: currentTrack.artistName } : null}
-            nowTime={currentTime}
-            nowDuration={duration}
-            nowProgress={progress}
-            nowMeta={currentFeatures && currentNorm
-              ? { bpm: currentFeatures.bpm, nrg: currentNorm.energy, mood: currentNorm.mood }
-              : null}
-            next={nextTrack ? { name: nextTrack.name, artistName: nextTrack.artistName } : null}
-            nextMeta={nextFeatures && nextNorm
-              ? { bpm: nextFeatures.bpm, nrg: nextNorm.energy, mood: nextNorm.mood }
-              : null}
-          />
-        )
-      })()}
+      <TrackDisplay
+        currentTrack={currentTrack}
+        nextTrack={nextTrack}
+        currentTime={currentTime}
+        duration={duration}
+        progress={progress}
+      />
 
       {/* ── Button Guard Text Labels ─────────────────────── */}
       <div className="np-btn-labels">
