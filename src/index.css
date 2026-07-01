@@ -67,14 +67,16 @@ input[type='range'] {
   position: absolute;
   top: 0;
   left: 0;
-  height: 100%;
-  width: 145vw;
+  /* Keep the same width:height ratio as the auth panel (54vw:100vh) so the
+     diagonal angle matches, scaled up (×~2.15) to cover the whole screen. */
+  width: 116vw;
+  height: 215vh;
   display: block;
   transform: translateX(0);
   transition: transform 0.95s cubic-bezier(0.76, 0, 0.24, 1);
 }
 .auth-intro--slide .auth-intro-red {
-  transform: translateX(-150vw);
+  transform: translateX(-120vw);
 }
 
 /* Centered Lottie (loading → reveal), fades out before the cover slides */
