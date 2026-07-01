@@ -90,10 +90,11 @@ input[type='range'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.4s ease, transform 0.45s ease-out;
 }
 .auth-intro--fade .auth-intro-logo {
   opacity: 0;
+  transform: translate(-50%, -50%) scale(2);
 }
 
 .auth-stage {
