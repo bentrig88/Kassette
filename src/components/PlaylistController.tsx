@@ -149,7 +149,9 @@ export function PlaylistController() {
           <span className="pf-title">MIXTAPE FILTERS</span>
           <span className="pf-analyzed">
             {isInserted && (!enoughData
-              ? `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`
+              ? (featuresMap.size < 5
+                  ? 'Analyzing your library…'
+                  : `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`)
               : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
           </span>
         </div>
