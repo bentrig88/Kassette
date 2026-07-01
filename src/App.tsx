@@ -15,6 +15,9 @@ import { CassetteCarousel } from './components/CassetteCarousel'
 import { CassettePlayer } from './components/CassettePlayer'
 import { PlaylistController } from './components/PlaylistController'
 import { SceneBackground } from './components/SceneBackground'
+import { VhsOverlay } from './components/VhsOverlay'
+import { VhsDebug } from './components/VhsDebug'
+import { useVhsParams } from './hooks/useVhsParams'
 import './index.css'
 
 function usePlayerScale() {
@@ -42,6 +45,7 @@ export default function App() {
   const setAllTracks = useMusicStore((s) => s.setAllTracks)
   const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
+  const { vals: vhsVals, set: setVhs } = useVhsParams()
 
   useBackgroundAnalysis(allTracks)
   const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
@@ -96,12 +100,11 @@ export default function App() {
     loadLibrary()
   }, [isAuthenticated, setLoading, setLoadingProgress, setError, setCassettes, setAllTracks])
 
+  let screen
   if (!isAuthenticated) {
-    return <AuthScreen />
-  }
-
-  if (isLoading) {
-    return (
+    screen = <AuthScreen vhs={vhsVals} />
+  } else if (isLoading) {
+    screen = (
       <div className="loading-screen">
         <div className="loading-card">
           <div className="loading-title">Loading your library...</div>
@@ -112,10 +115,8 @@ export default function App() {
         </div>
       </div>
     )
-  }
-
-  if (error) {
-    return (
+  } else if (error) {
+    screen = (
       <div className="loading-screen">
         <div className="loading-card">
           <div className="loading-title">Something went wrong</div>
@@ -132,38 +133,47 @@ export default function App() {
         </div>
       </div>
     )
+  } else {
+    screen = (
+      <>
+        <SceneBackground />
+        <div className="app">
+          <button
+            className="signout-btn signout-btn--floating"
+            onClick={async () => {
+              try {
+                getMusicKitInstance().stop()
+                await getMusicKitInstance().unauthorize()
+              } catch {/* */}
+              setAuthenticated(false)
+              setCassettes([])
+            }}
+          >
+            Sign out
+          </button>
+
+          <div className="app-main">
+            <CassetteCarousel />
+            <div className="player-filter-wrapper">
+              <div className="player-scale-container">
+                <div className="np-player-wrapper">
+                  <CassettePlayer />
+                </div>
+              </div>
+              <PlaylistController />
+            </div>
+          </div>
+        </div>
+      </>
+    )
   }
 
   return (
     <>
-    <SceneBackground />
-    <div className="app">
-      <button
-        className="signout-btn signout-btn--floating"
-        onClick={async () => {
-          try {
-            getMusicKitInstance().stop()
-            await getMusicKitInstance().unauthorize()
-          } catch {/* */}
-          setAuthenticated(false)
-          setCassettes([])
-        }}
-      >
-        Sign out
-      </button>
-
-      <div className="app-main">
-        <CassetteCarousel />
-        <div className="player-filter-wrapper">
-          <div className="player-scale-container">
-            <div className="np-player-wrapper">
-              <CassettePlayer />
-            </div>
-          </div>
-          <PlaylistController />
-        </div>
-      </div>
-    </div>
+      {screen}
+      {/* VHS overlay + tuning panel — on top of every screen, click-through */}
+      <VhsOverlay />
+      <VhsDebug vals={vhsVals} onChange={setVhs} />
     </>
   )
 }

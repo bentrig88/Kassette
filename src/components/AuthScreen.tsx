@@ -1,18 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
-import { VhsOverlay } from './VhsOverlay'
-import { VhsDebug } from './VhsDebug'
-import { useVhsParams } from '../hooks/useVhsParams'
 import authBg from '../assets/auth/auth-background.jpg'
 import authRedBack from '../assets/auth/auth-red-back.svg'
 import authTape from '../assets/auth/auth-tape.png'
 import authTapeShadow from '../assets/auth/auth-tape-shadow.png'
 import authLogo from '../assets/auth/auth-logo.svg'
 
-export function AuthScreen() {
+export function AuthScreen({ vhs }: { vhs: Record<string, number> }) {
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { vals, set } = useVhsParams()
+  const vals = vhs
 
   // Randomized displacement-band motion: move to a random spot, pause, move
   // again (up or down), occasionally slip off-screen — driven via rAF so it's
@@ -148,9 +145,6 @@ export function AuthScreen() {
           <feDisplacementMap in="SourceGraphic" in2="n" scale={vals.dispScale} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
-
-      <VhsOverlay />
-      <VhsDebug vals={vals} onChange={set} />
     </div>
   )
 }

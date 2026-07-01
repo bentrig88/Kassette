@@ -14,7 +14,7 @@ export function VhsDebug({ vals, onChange }: VhsDebugProps) {
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="dbg-root">
+    <div className="dbg-root dbg-root--vhs">
       {open && (
         <div className="dbg-panel">
           <div className="dbg-title">VHS debug</div>
