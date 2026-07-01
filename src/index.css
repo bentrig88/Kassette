@@ -111,9 +111,10 @@ input[type='range'] {
 .auth-content {
   position: absolute;
   z-index: 4;
-  left: 5.5%;
+  /* centered inside the red panel (which spans 0–54% → center at 27%) */
+  left: 27%;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   width: 42%;
   max-width: 800px;
   display: flex;
