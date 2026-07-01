@@ -27,7 +27,7 @@ src/
     music.ts            App types: Genre, Cassette, Track, PlaybackState, AudioQuality
   store/
     musicStore.ts       Auth state, cassettes array, selected carousel index, loading
-    playerStore.ts      Playback state, inserted cassette, queuedTracks, volume, quality, filter sliders
+    playerStore.ts      Playback state, inserted cassette, queuedTracks, baseQueue (full shuffled queue for subgenre re-filtering), volume, quality, filter sliders
   services/
     appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
     audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, spectral flux + tempo prior, centroid, chroma, KS key); runs in the worker
@@ -55,6 +55,8 @@ src/
     PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
     SceneBackground.tsx     Persistent generic background + decorative objects (playback)
     GenreBackground.tsx     Per-genre tape-selection photo + diagonal wipe + mouse parallax
+    BackgroundDebug.tsx     Dev ⚙ panel: blur + dark-overlay sliders (CSS vars, localStorage)
+    SubgenreSelect.tsx      Checkbox multi-select dropdown for the Mixtape Filters subgenre picker
   assets/
     tapes/
       cassette-body-flat.png        Flattened PNG composite of all static cassette body layers (@2x)
@@ -201,9 +203,9 @@ Raw measurements have no meaningful absolute 0–100 mapping — a fixed constan
 
 ### Analysis Priority & Background Processing
 Both passes use a **bounded concurrency pool** (`lib/mapPool.ts`, `CONCURRENCY = 6`) — up to 6 clips fetched + decoded + analyzed in parallel. (Previously each pass was a sequential loop with an artificial per-track delay — 100ms active / 1s background — which made full-library coverage take 30+ minutes; the pool removes that.)
-- **Active cassette**: `usePreviewAnalysis(displayQueue)` analyzes the active queue on cassette insert.
+- **Active cassette**: `usePreviewAnalysis(displayQueue)` analyzes the active queue. It **re-runs when the track SET changes** (keyed on the sorted track ids), NOT on reorder — so subgenre filtering triggers fresh analysis of the newly-eligible tracks (cancelling the in-flight run), while slider re-sorts don't restart it.
 - **All other tracks**: `useBackgroundAnalysis(allTracks)` starts after a 10s delay (so the active cassette gets priority) and analyzes the rest of the library, skipping already-cached entries.
-Both cancel cleanly on unmount (a `cancelled` flag passed to `mapPool`'s `shouldStop`).
+Both cancel cleanly on unmount / queue change (a `cancelled` flag passed to `mapPool`'s `shouldStop`).
 
 ### Sorting Logic
 `sortTracksByFilters(tracks, featuresMap, tempo, energy, mood)` in `appleMusic.ts`:
@@ -215,9 +217,9 @@ Both cancel cleanly on unmount (a `cancelled` flag passed to `mapPool`'s `should
 
 ### Queue Management
 `playQueueFrom(tracks, startIndex)` in `appleMusic.ts`:
-- Loads a 20-track window from the sorted queue into MusicKit's internal queue, then stop() + play()
-- Used by the **Next** button and the `completed` auto-advance handler
-- Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order
+- Loads a 20-track window from the sorted queue into MusicKit's internal queue via `setQueue`, then `play()` — **no `stop()`** (a `stop()` after `setQueue` hits MusicKit's "play() without stop/pause" invalid state and silently fails).
+- Used by the **Next** button, the `completed` auto-advance handler, AND `handlePlay`'s fresh start from `stopped` (so Play always plays our — possibly subgenre-filtered — `queuedTracks` from `currentTrackIndex`, not MusicKit's stale internal queue). Resuming from `paused` just calls `music.play()`.
+- Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order.
 
 ### Slider Auto-Snap
 When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag).
@@ -419,20 +421,29 @@ Two one-shot sounds wired into the door animation `useEffect` in `CassettePlayer
 
 ---
 
-## Playlist Filters UI (Phase 3)
+## Mixtape Filters UI (Phase 3)
 
-Redesigned `PlaylistController` to match the Figma design (`node 63:677`).
+`PlaylistController` — titled **"MIXTAPE FILTERS"** (renamed from "Playlist Filters").
 
 ### Layout & container
 `.pf-container`: `backdrop-filter: blur(20px)`, `background: rgba(255,255,255,0.1)`, `border-radius: 36px`, `box-shadow: 0 12px 12px rgba(0,0,0,0.25)`, `padding: 20px 24px`.
-Header row: "PLAYLIST FILTERS" left + "N upcoming tracks analyzed" right. Title is Kode Mono; the analyzed count is **Afacad 14px, weight 400** (enlarged + lightened from the original Kode Mono 10px). Both white.
+Header (`.pf-header`) is a row: a left `.pf-header-titles` column ("MIXTAPE FILTERS" 24px Afacad 700 with the "N upcoming tracks analyzed" line **stacked below it**, Afacad 12px/400, dimmed) + the subgenre dropdown on the right.
 
 ### Custom slider
-Each filter uses `.pf-slider-track` (glass pill: `rgba(255,255,255,0.17)` bg, `1px solid rgba(255,255,255,0.2)` border, `border-radius: 28px`, `padding: 4px`) containing a native `<input type="range">` styled with `appearance: none`.
-- Fill: `linear-gradient(to right, #E20025 var(--pf-fill), rgba(255,255,255,0.12) var(--pf-fill))` — `--pf-fill` is set as an inline CSS variable from `value%`. (Brand red, matched to the Insert Tape button.)
-- Thumb: 20px flat `#E20025` circle, `box-shadow: 0 0 0 1px rgba(255,255,255,0.2)`. Both `::-webkit-slider-thumb` and `::-moz-range-thumb` defined.
-- Filter label: Afacad 700, 20px. End labels (Slow/Fast etc.): Afacad 400, 14px.
-- `.pf-filter` is a flex column with `gap: 12px` between each title and its slider.
+Each filter uses `.pf-slider-track` (glass pill) containing a native `<input type="range">` styled with `appearance: none`.
+- Fill + thumb: brand red `#E20025` (matched to the Insert Tape button). `--pf-fill` inline var drives the fill %.
+- Filter label: Afacad 700, 20px. End labels (Slow/Fast etc.): Afacad 400, 14px, pulled ~6px closer to the slider.
+- Disabled (grayed, `pointer-events:none`) until ≥5 upcoming tracks are analyzed.
+
+### Subgenre multi-select (`SubgenreSelect.tsx`)
+Custom checkbox dropdown (native `<select>` can't do checkboxes) in the header's top-right; **opens upward** (`bottom: 100%`).
+- Options = distinct `genreNames` across `currentCassette.tracks` (the FULL cassette), sorted; "All" is added by the component. Closes on outside click. Pill label shows `All` / the single name / `N subgenres`.
+- Selection is a `string[]` in `PlaylistController` (empty = All). Resets to All on cassette change (adjust-state-on-render pattern, not an effect).
+
+### Filtering logic (`applyAll`)
+Rebuilds the upcoming queue: `played = queuedTracks[0..currentTrackIndex]`, then candidates from a pool minus played, optionally filtered to tracks whose `genreNames` intersect the selected subgenres (ANY match), then `sortTracksByFilters`.
+- **Pool:** when subgenres are selected → the FULL `currentCassette.tracks` (so niche subgenres beyond the shuffled 100-track queue still surface). When "All" → `baseQueue` (the full shuffled queue captured at insert — `playerStore.baseQueue`), preserving the per-insert shuffle. Options come from the full cassette to match the subgenre pool (avoids listing subgenres that would filter to empty).
+- **"Now" refresh when stopped:** a subgenre change while `playbackState === 'stopped'` rebuilds the WHOLE queue (played = []) and resets `currentTrackIndex` to 0, so the NOW track reflects the new selection; the next Play re-syncs MusicKit via `playQueueFrom`. While playing/paused the current track is preserved and only the upcoming list changes. Slider drags never trigger a MusicKit re-sync (avoids thrash).
 
 ---
 
@@ -452,13 +463,22 @@ Replaces the old blur/white carousel overlays. Behaviour:
 - Full-screen per-genre photo (z-index 20, above the player, below the carousel at 30) with a dark scrim for legibility.
 - **Diagonal directional wipe** on tape change: an incoming photo layer animates a 4-vertex `clip-path` (constant vertex count so Framer interpolates without jumps); direction from `getWipeDirection` (shortest path around the ring; wrap last→first reads "right"). `SLANT` controls the diagonal angle. Duration 0.3s.
 - **Mouse parallax**: the photo layer is scaled `PARALLAX_SCALE` (1.1) and translated up to `±MAX_SHIFT%` (3%) opposite the cursor, spring-smoothed. Scale overflow (5%) > shift (3%) so an edge can never be exposed. Scrim sits outside the parallax wrapper.
+- **Blur + scrim are CSS-variable driven** (see debug panel): `.genre-bg-photo` uses `filter: blur(var(--genre-bg-blur, 2px))`; the scrim is a **uniform black** layer with `opacity: var(--genre-bg-overlay, 0.4)` (0 = transparent … 1 = solid black — replaced the fixed gradient so the darkness spans the full range).
 - Fades out (0.4s) on insert, gated on `!isInserted && !isInserting`.
 - **Critical:** ref bookkeeping (`prevIndexRef`/`prevSrcRef`) lives in the effect body, NOT inside the `setLayers` updater — StrictMode double-invokes updaters in dev and would collapse every wipe to "right". Layer prune keys on the stable `layer.id`.
 
-### Tape-selection UI pass
-- **Carousel title** `.carousel-title` — "CHOOSE YOUR GENRE", centered white uppercase Afacad 700, anchored above the (vertically-centered) carousel; fades with the carousel on insert.
-- **Insert Tape button** — solid red `#E20025`, no border, Afacad 700 ~1.85rem uppercase pill.
-- **Nav arrows** `.nav-arrow` — full circles (`3.85rem`, `border-radius: 50%`), flex-centered glyphs enlarged to 3rem. The `‹`/`›` guillemets are optically re-centered via inner-edge padding on `:first-child`/`:last-child` + a 2px `padding-bottom`; `gap: 1.25rem` between them.
+### Background debug panel (`BackgroundDebug.tsx`)
+Dev tuning tool, bottom-right ⚙ in the tape-selection state only. Popup with two sliders that live-drive the CSS vars above — **Blur** (0–20px) → `--genre-bg-blur`; **Dark overlay** (0–100%) → `--genre-bg-overlay`. Values persist to `localStorage` (`kassette-dbg-blur`, `kassette-dbg-darkness`).
+
+### Carousel header
+Stacked column centered above the tapes (`.carousel-header`, fades with the carousel on insert):
+- **`.carousel-title`** — "CHOOSE YOUR GENRE", small uppercase Afacad 600 label.
+- **`.carousel-genre`** — the focused tape's genre in big (6rem Afacad 700, uppercase), fading on each tape change (keyed `motion.span`).
+
+### Button hovers (unified)
+- **Insert Tape** (`.insert-button`) — solid red `#E20025`, no border, Afacad 700 ~1.85rem uppercase pill. Hover: lighter red `#ff2a4c` + `scale(1.06)` (overshoot ease) + shadow softens (`0 6px 18px` → `0 16px 38px`, lower alpha).
+- **Nav arrows** (`.nav-arrow`) — full circles (`3.85rem`), flex-centered glyphs (3rem); `‹`/`›` optically re-centered via inner-edge padding on `:first-child`/`:last-child` + 2px `padding-bottom`; `gap: 1.25rem`.
+- **Nav arrows + Sign Out** share the Sign Out glass fill (`rgba(255,255,255,0.12)` + `backdrop-filter: blur(20px)`) and one hover: brighten to `rgba(255,255,255,0.24)` + `scale(1.06)`.
 - **Carousel drag fixes** — `dragMomentum={false}` so hard flicks snap deterministically; `onDragStart` stops any in-flight snap animation; cassette `<img>`s use `draggable={false}` + `-webkit-user-drag:none` to stop the native image-drag ghost.
 
 ### Player logo & chrome
