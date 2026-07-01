@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { imgLeftReelTape, imgRightReelTape } from '../assets/tapes/cassetteAssets'
-import cassette0 from '../assets/tapes/cassette0-body-flat.png'
+import cassette0 from '../assets/tapes/cassette0-body-flat.webp'
 import logoUrl from '../assets/auth/auth-logo.svg'
 import { TrackScreen } from './TrackScreen'
 import type { ScreenTrack, ScreenMeta } from './TrackScreen'

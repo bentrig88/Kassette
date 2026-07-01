@@ -1,14 +1,14 @@
 // Single source of truth for genre → tape-selection background photo.
 // Edit genreBackgroundMap to reassign a photo to a genre.
-import bgGeneric from './background-generic.jpg'
-import tapeBackRock from './tape_back_rock.jpg'
-import tapeBackHiphop from './tape_back_hiphop.jpg'
-import tapeBackElectro from './tape_back_electro.jpg'
-import tapeBackReggae from './tape_back_reggae.jpg'
-import tapeBackClassical from './tape_back_classical.jpg'
-import tapeBackFolk from './tape_back_folk.jpg'
-import tapeBackJazz from './tape_back_jazz.jpg'
-import tapeBackPop from './tape_back_pop.jpg'
+import bgGeneric from './background-generic.webp'
+import tapeBackRock from './tape_back_rock.webp'
+import tapeBackHiphop from './tape_back_hiphop.webp'
+import tapeBackElectro from './tape_back_electro.webp'
+import tapeBackReggae from './tape_back_reggae.webp'
+import tapeBackClassical from './tape_back_classical.webp'
+import tapeBackFolk from './tape_back_folk.webp'
+import tapeBackJazz from './tape_back_jazz.webp'
+import tapeBackPop from './tape_back_pop.webp'
 
 export const genreBackgroundMap: Record<string, string> = {
   'Rock': tapeBackRock,

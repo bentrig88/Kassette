@@ -1,6 +1,10 @@
 /**
- * Composites the ct-swapable cassette body layers into a single PNG.
+ * Composites the ct-swapable cassette body layers into a single PNG, then converts to WebP.
  * Run: node scripts/flatten-cassette-body.mjs
+ *
+ * The shipped format is WebP (cassette-body-flat.webp). The intermediate PNG is kept as a
+ * temp artifact but only the .webp is imported by cassetteAssets.ts.
+ * Manual conversion step: cwebp -q 90 <out>.png -o <out>.webp
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { execSync } from 'child_process'
@@ -69,3 +73,8 @@ console.log(`Composite SVG written to ${OUT_SVG}`)
 execSync(`sips -s format png "${OUT_SVG}" --out "${OUT_PNG}"`, { stdio: 'inherit' })
 console.log(`PNG written to ${OUT_PNG}`)
 console.log(`Size: ${W}×${H}px (@${SCALE}x)`)
+
+// Convert to WebP — this is the shipped format imported by cassetteAssets.ts
+const OUT_WEBP = OUT_PNG.replace(/\.png$/, '.webp')
+execSync(`/opt/homebrew/bin/cwebp -q 90 "${OUT_PNG}" -o "${OUT_WEBP}"`, { stdio: 'inherit' })
+console.log(`WebP written to ${OUT_WEBP}`)

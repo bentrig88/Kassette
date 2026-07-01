@@ -6,7 +6,7 @@ import { buildNormalizer } from '../services/featureNormalize'
 import { useAssetPreloader } from '../hooks/useAssetPreloader'
 import { LoadingTape } from './LoadingTape'
 import type { ScreenTrack, ScreenMeta } from './TrackScreen'
-import authBg from '../assets/auth/auth-background.jpg'
+import authBg from '../assets/auth/auth-background.webp'
 
 const INTRO_MS = 1000        // red phase duration before crossfade to concrete
 const CYCLE_MS = 450         // LCD track cycle interval

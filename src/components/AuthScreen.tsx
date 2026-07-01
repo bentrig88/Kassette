@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
-// import authBg from '../assets/auth/auth-background.jpg'
+// import authBg from '../assets/auth/auth-background.webp'
 import authRedBack from '../assets/auth/auth-red-back.svg'
-import authTape from '../assets/auth/auth-tape.png'
-import authTapeShadow from '../assets/auth/auth-tape-shadow.png'
+import authTape from '../assets/auth/auth-tape.webp'
+import authTapeShadow from '../assets/auth/auth-tape-shadow.webp'
 import authLogo from '../assets/auth/auth-logo.svg'
 
 export function AuthScreen({ vhs }: { vhs: Record<string, number> }) {

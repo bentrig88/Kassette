@@ -3,14 +3,14 @@
 
 import _imgLeftReelTape from './cassette-reel-left.svg'
 import _imgRightReelTape from './cassette-reel-right.svg'
-import _imgBodyFlat from './cassette-body-flat.png'
-import _imgBody2Flat from './cassette2-body-flat.png'
-import _imgBody3Flat from './cassette3-body-flat.png'
-import _imgBody4Flat from './cassette4-body-flat.png'
-import _imgBody5Flat from './cassette5-body-flat.png'
-import _imgBody6Flat from './cassette6-body-flat.png'
-import _imgBody7Flat from './cassette7-body-flat.png'
-import _imgBody8Flat from './cassette8-body-flat.png'
+import _imgBodyFlat from './cassette-body-flat.webp'
+import _imgBody2Flat from './cassette2-body-flat.webp'
+import _imgBody3Flat from './cassette3-body-flat.webp'
+import _imgBody4Flat from './cassette4-body-flat.webp'
+import _imgBody5Flat from './cassette5-body-flat.webp'
+import _imgBody6Flat from './cassette6-body-flat.webp'
+import _imgBody7Flat from './cassette7-body-flat.webp'
+import _imgBody8Flat from './cassette8-body-flat.webp'
 
 export const imgLeftReelTape = _imgLeftReelTape
 export const imgRightReelTape = _imgRightReelTape
