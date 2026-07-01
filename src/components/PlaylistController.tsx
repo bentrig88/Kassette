@@ -43,15 +43,10 @@ export function PlaylistController() {
   const setEnergyFilter = usePlayerStore((s) => s.setEnergyFilter)
   const setMoodFilter = usePlayerStore((s) => s.setMoodFilter)
   const featuresMap = usePlayerStore((s) => s.featuresMap)
-  const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
-  const queuedTracks = usePlayerStore((s) => s.queuedTracks)
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
-  const setQueuedTracks = usePlayerStore((s) => s.setQueuedTracks)
-  const baseQueue = usePlayerStore((s) => s.baseQueue)
   const isInserted = usePlayerStore((s) => s.isInserted)
-  const playbackState = usePlayerStore((s) => s.playbackState)
-  const setCurrentTrackIndex = usePlayerStore((s) => s.setCurrentTrackIndex)
+  const queuedTracks = usePlayerStore((s) => s.queuedTracks)
 
   // Selected subgenres; empty = "All" (no subgenre restriction).
   const [subgenres, setSubgenres] = useState<string[]>([])
@@ -76,39 +71,42 @@ export function PlaylistController() {
   // optionally restricted to the selected subgenres (ANY match), then sorted by
   // the sliders. Basing on baseQueue (not the current, possibly-filtered queue)
   // lets clearing the selection restore everything.
+  // Reads all store state imperatively via getState() so the callback is stable
+  // (empty dep array) — applyAll is only ever called from event handlers, never
+  // during render, so getState() always returns the latest committed state.
   const applyAll = useCallback(
     (tempo: number, energy: number, mood: number, subs: string[], rebuildNow = false) => {
-      if (!isInserted) return
+      const s = usePlayerStore.getState()
+      if (!s.isInserted) return
 
       // When nothing is playing, a subgenre change rebuilds the WHOLE queue
       // (including the "now" track) so it reflects the new selection; otherwise
       // the current track is preserved and only the upcoming list changes.
-      const rebuild = rebuildNow && playbackState === 'stopped'
-      const played = rebuild ? [] : queuedTracks.slice(0, currentTrackIndex + 1)
+      const rebuild = rebuildNow && s.playbackState === 'stopped'
+      const played = rebuild ? [] : s.queuedTracks.slice(0, s.currentTrackIndex + 1)
       const playedIds = new Set(played.map((t) => t.id))
 
       // Subgenre filter searches the FULL cassette (so niche subgenres beyond the
       // shuffled 100-track queue still surface their tracks). "All" uses the fresh
       // 100-track baseQueue to preserve the per-insert shuffle.
       const pool = subs.length > 0
-        ? (currentCassette?.tracks ?? [])
-        : (baseQueue.length > 0 ? baseQueue : (currentCassette?.tracks ?? []))
+        ? (s.currentCassette?.tracks ?? [])
+        : (s.baseQueue.length > 0 ? s.baseQueue : (s.currentCassette?.tracks ?? []))
       if (pool.length === 0) return
 
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
-      const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood, normalizer)
-      const newQueue = [...played, ...sortedUpcoming]
-      setQueuedTracks(newQueue)
+      const sortedUpcoming = sortTracksByFilters(candidates, s.featuresMap, tempo, energy, mood, buildNormalizer(s.featuresMap))
+      s.setQueuedTracks([...played, ...sortedUpcoming])
 
       if (rebuild) {
         // Re-point to the new first track; the next Play re-syncs MusicKit's queue
         // via playQueueFrom (see CassettePlayer.handlePlay), which is the proven
         // setQueue-then-play path.
-        setCurrentTrackIndex(0)
+        s.setCurrentTrackIndex(0)
       }
     },
-    [isInserted, playbackState, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, normalizer, setQueuedTracks, setCurrentTrackIndex]
+    [],
   )
 
   function handleTempo(v: number) {
