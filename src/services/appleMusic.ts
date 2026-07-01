@@ -144,17 +144,17 @@ export async function fetchPreviewUrls(tracks: Track[]): Promise<Map<string, str
   return result
 }
 
-function matchesGenre(track: Track, genre: Genre): boolean {
+function matchesGenre(lowerGenres: string[], genre: Genre): boolean {
   const keywords = GENRE_KEYWORDS[genre]
-  const trackGenres = track.genreNames.map((g) => g.toLowerCase())
-  return keywords.some((kw) => trackGenres.some((tg) => tg.includes(kw)))
+  return keywords.some((kw) => lowerGenres.some((tg) => tg.includes(kw)))
 }
 
 export function buildCassettes(tracks: Track[]): Cassette[] {
+  const lowered = tracks.map((t) => ({ track: t, lower: t.genreNames.map((g) => g.toLowerCase()) }))
   const cassettes: Cassette[] = []
 
   for (const genre of GENRES) {
-    const matched = tracks.filter((t) => matchesGenre(t, genre))
+    const matched = lowered.filter((x) => matchesGenre(x.lower, genre)).map((x) => x.track)
     if (matched.length > 0) {
       cassettes.push({
         id: genre,
