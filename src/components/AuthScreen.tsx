@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
+import { VhsOverlay } from './VhsOverlay'
 import authBg from '../assets/auth/auth-background.jpg'
 import authRedBack from '../assets/auth/auth-red-back.svg'
 import authTape from '../assets/auth/auth-tape.png'
@@ -53,6 +54,8 @@ export function AuthScreen() {
           {error && <p className="auth-error">{error}</p>}
         </div>
       </div>
+
+      <VhsOverlay intensity={1} />
     </div>
   )
 }
