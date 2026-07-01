@@ -52,11 +52,29 @@ input[type='range'] {
   font-family: 'Afacad', sans-serif;
 }
 
-/* Stage: real content, warped by the SVG horizontal-displacement filter */
 .auth-stage {
   position: absolute;
   inset: 0;
-  filter: url(#vhs-displace);
+}
+
+/* Displaced copy, shown only inside a moving horizontal band (clip-path) */
+.auth-stage--glitch {
+  filter: url(#vhs-shift);
+  pointer-events: none;
+  clip-path: inset(100% 0 0 0);
+  animation: vhs-band 9s linear infinite;
+  will-change: clip-path;
+}
+
+@keyframes vhs-band {
+  0%, 18%      { clip-path: inset(100% 0 0 0); }      /* hidden */
+  18.01%       { clip-path: inset(-8% 0 100% 0); }    /* enter at top... */
+  36%          { clip-path: inset(100% 0 -8% 0); }    /* ...travel down & exit */
+  36.01%, 58%  { clip-path: inset(100% 0 0 0); }      /* hidden */
+  58.01%       { clip-path: inset(-8% 0 100% 0); }
+  70%          { clip-path: inset(52% 0 40% 0); }     /* enters, stalls mid */
+  80%          { clip-path: inset(100% 0 -8% 0); }    /* exits */
+  80.01%, 100% { clip-path: inset(100% 0 0 0); }      /* hidden */
 }
 
 /* Hidden host for the SVG filter definition */
