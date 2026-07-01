@@ -15,6 +15,7 @@ import type { AudioQuality } from '../types/music'
 import * as A from '../assets/player/playerAssets'
 import logoUrl from '../assets/misc/logo.svg'
 import { CassetteTapeBody } from './CassetteTapeBody'
+import { TrackScreen } from './TrackScreen'
 
 // dB meter tick positions: y offset relative to db frame top (frame is at player y=45)
 const DB_TICKS = [
@@ -30,12 +31,6 @@ const DB_TICKS = [
   { label: '-10', y: 240 },
   { label: '-20', y: 286 },
 ]
-
-function formatTime(sec: number) {
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 export function CassettePlayer() {
   const {
@@ -509,77 +504,25 @@ export function CassettePlayer() {
       </div>
 
       {/* ── Screen ───────────────────────────────────────── */}
-      <div className="np-screen">
-        {/* Content */}
-        <div className="np-screen-inner">
-          {/* NEXT column */}
-          <div className="np-screen-col np-screen-col--next">
-            <div className="np-screen-header">
-              <span className="np-screen-label">NEXT</span>
-            </div>
-            {nextTrack ? (
-              <>
-                <div className="np-screen-progress-track np-screen-progress-track--empty" />
-                <div className="np-screen-title np-screen-title--dim">{nextTrack.name}</div>
-                <div className="np-screen-artist np-screen-artist--dim">{nextTrack.artistName}</div>
-              </>
-            ) : (
-              <div className="np-screen-artist np-screen-artist--dim">—</div>
-            )}
-            {(() => {
-              const nextFeatures = nextTrack ? featuresMap.get(nextTrack.id) : undefined
-              const nextNorm = nextFeatures ? normalizer.normalize(nextFeatures) : undefined
-              return nextFeatures && nextNorm ? (
-                <div className="np-screen-meta np-screen-meta--dim">
-                  <span>{nextFeatures.bpm} BPM</span>
-                  <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                  <span>NRG {nextNorm.energy}</span>
-                  <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                  <span>MOOD {nextNorm.mood}</span>
-                </div>
-              ) : (
-                <div className="np-screen-meta np-screen-meta--placeholder" />
-              )
-            })()}
-          </div>
-
-          <div className="np-screen-divider" />
-
-          {/* NOW column */}
-          <div className="np-screen-col np-screen-col--now">
-            <div className="np-screen-header">
-              <span className="np-screen-label">NOW</span>
-              {currentTrack && (
-                <span className="np-screen-time">{formatTime(currentTime)} / {formatTime(duration)}</span>
-              )}
-            </div>
-            {currentTrack ? (
-              <>
-                <div className="np-screen-progress-track">
-                  <div className="np-screen-progress-fill" style={{ width: `${progress * 100}%` }} />
-                </div>
-                <div className="np-screen-title">{currentTrack.name}</div>
-                <div className="np-screen-artist">{currentTrack.artistName}</div>
-              </>
-            ) : (
-              <div className="np-screen-idle">INSERT TAPE</div>
-            )}
-            {currentFeatures && currentNorm ? (
-              <div className="np-screen-meta">
-                <span>{currentFeatures.bpm} BPM</span>
-                <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                <span>NRG {currentNorm.energy}</span>
-                <img src={A.imgLine14} alt="" className="np-meta-sep" />
-                <span>MOOD {currentNorm.mood}</span>
-              </div>
-            ) : (
-              <div className="np-screen-meta np-screen-meta--empty">NO DATA</div>
-            )}
-          </div>
-        </div>
-        {/* Glass reflection */}
-        <div className="np-screen-glass" />
-      </div>
+      {(() => {
+        const nextFeatures = nextTrack ? featuresMap.get(nextTrack.id) : undefined
+        const nextNorm = nextFeatures ? normalizer.normalize(nextFeatures) : undefined
+        return (
+          <TrackScreen
+            now={currentTrack ? { name: currentTrack.name, artistName: currentTrack.artistName } : null}
+            nowTime={currentTime}
+            nowDuration={duration}
+            nowProgress={progress}
+            nowMeta={currentFeatures && currentNorm
+              ? { bpm: currentFeatures.bpm, nrg: currentNorm.energy, mood: currentNorm.mood }
+              : null}
+            next={nextTrack ? { name: nextTrack.name, artistName: nextTrack.artistName } : null}
+            nextMeta={nextFeatures && nextNorm
+              ? { bpm: nextFeatures.bpm, nrg: nextNorm.energy, mood: nextNorm.mood }
+              : null}
+          />
+        )
+      })()}
 
       {/* ── Button Guard Text Labels ─────────────────────── */}
       <div className="np-btn-labels">
