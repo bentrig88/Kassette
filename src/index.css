@@ -340,6 +340,15 @@ input[type='range'] {
   transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease, opacity 0.15s;
 }
 
+/* Apple logo inside the button — inherits the red text color, sized to the text */
+.auth-apple {
+  height: 0.82em;
+  width: auto;
+  display: inline-block;
+  vertical-align: -0.06em;
+  margin: 0 0.06em;
+}
+
 .auth-button:hover:not(:disabled) {
   transform: scale(1.04);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
