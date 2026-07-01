@@ -92,7 +92,7 @@ input[type='range'] {
   top: 50%;
   transform: translate(-50%, -50%);
   width: 44%;
-  max-width: 780px;
+  max-width: 1000px;
   height: auto;
   pointer-events: none;
 }
