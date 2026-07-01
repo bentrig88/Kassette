@@ -63,7 +63,7 @@ export function AuthScreen() {
           screen at irregular times. The map is neutral gray (= no displacement)
           everywhere except a moving feFlood band filled with turbulence. */}
       <svg className="vhs-svg" aria-hidden="true">
-        <filter id="vhs-displace" x="-10%" y="-10%" width="120%" height="120%">
+        <filter id="vhs-displace" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
           <feFlood floodColor="#808080" result="neutral" />
           <feTurbulence type="fractalNoise" baseFrequency="0.00001 0.6" numOctaves={1} seed={4} result="turb">
             <animate attributeName="seed" dur="0.5s" values="4;9;2;7;1" repeatCount="indefinite" calcMode="discrete" />
