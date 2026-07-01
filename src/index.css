@@ -68,8 +68,8 @@ input[type='range'] {
   inset: -30%;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 170px 170px;
-  opacity: 0.22;
-  animation: vhs-grain 0.45s steps(5) infinite;
+  opacity: var(--vhs-grain-op, 0.22);
+  animation: vhs-grain var(--vhs-grain-speed, 0.45s) steps(5) infinite;
 }
 
 /* Colored glitch tear-bands, jittering horizontally */
@@ -81,8 +81,8 @@ input[type='range'] {
       rgba(0, 255, 255, 0.10) 26px, rgba(0, 255, 255, 0.10) 28px,
       transparent 28px, transparent 54px,
       rgba(255, 0, 110, 0.10) 54px, rgba(255, 0, 110, 0.10) 56px);
-  opacity: 0.7;
-  animation: vhs-glitch 1.7s steps(9) infinite;
+  opacity: var(--vhs-glitch-op, 0.7);
+  animation: vhs-glitch var(--vhs-glitch-speed, 1.7s) steps(9) infinite;
 }
 
 /* Bright rolling scan bar drifting down */
@@ -93,20 +93,23 @@ input[type='range'] {
   background: linear-gradient(to bottom,
     transparent, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.16),
     rgba(255, 255, 255, 0.10), transparent);
-  animation: vhs-bar 7s linear infinite;
+  opacity: var(--vhs-bar-op, 1);
+  animation: vhs-bar var(--vhs-bar-speed, 7s) linear infinite;
 }
 
 /* Fine dark scanlines */
 .vhs-scanlines {
   inset: 0;
+  opacity: var(--vhs-scan-op, 1);
   background: repeating-linear-gradient(to bottom,
     rgba(0, 0, 0, 0.32) 0, rgba(0, 0, 0, 0.32) 1px,
-    transparent 1px, transparent 3px);
+    transparent 1px, transparent var(--vhs-scan-gap, 3px));
 }
 
 /* Vignette */
 .vhs-vignette {
   inset: 0;
+  opacity: var(--vhs-vig-op, 1);
   background: radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 0.5) 100%);
 }
 
@@ -119,9 +122,9 @@ input[type='range'] {
   100% { transform: translate(0, 0); }
 }
 @keyframes vhs-glitch {
-  0%, 100% { transform: translateX(0); opacity: 0.5; }
-  33%      { transform: translateX(-1.5%); opacity: 0.9; }
-  66%      { transform: translateX(1%); opacity: 0.65; }
+  0%, 100% { transform: translateX(0); }
+  33%      { transform: translateX(-1.5%); }
+  66%      { transform: translateX(1%); }
 }
 @keyframes vhs-bar {
   0%   { transform: translateY(-30%); }
@@ -129,9 +132,9 @@ input[type='range'] {
 }
 @keyframes vhs-flicker {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.9; }
+  50%      { opacity: var(--vhs-flicker-min, 0.9); }
   72%      { opacity: 0.97; }
-  88%      { opacity: 0.85; }
+  88%      { opacity: var(--vhs-flicker-min, 0.9); }
 }
 
 /* Concrete background (right side), softened + whitened toward the top */
@@ -503,6 +506,8 @@ input[type='range'] {
 
 .dbg-panel {
   width: 240px;
+  max-height: 78vh;
+  overflow-y: auto;
   padding: 14px 16px;
   background: rgba(20, 20, 20, 0.85);
   backdrop-filter: blur(12px);
