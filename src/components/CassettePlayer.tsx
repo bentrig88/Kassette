@@ -33,27 +33,25 @@ const DB_TICKS = [
 ]
 
 export function CassettePlayer() {
-  const {
-    currentCassette,
-    queuedTracks,
-    isInserted,
-    playbackState,
-    volume,
-    quality,
-    currentTrackIndex,
-    currentTime,
-    duration,
-    ejectCassette,
-    setPlaybackState,
-    setVolume,
-    setQuality,
-    setCurrentTrackIndex,
-    setCurrentTime,
-    setDuration,
-    setTempoFilter,
-    setEnergyFilter,
-    setMoodFilter,
-  } = usePlayerStore()
+  const currentCassette      = usePlayerStore((s) => s.currentCassette)
+  const queuedTracks         = usePlayerStore((s) => s.queuedTracks)
+  const isInserted           = usePlayerStore((s) => s.isInserted)
+  const playbackState        = usePlayerStore((s) => s.playbackState)
+  const volume               = usePlayerStore((s) => s.volume)
+  const quality              = usePlayerStore((s) => s.quality)
+  const currentTrackIndex    = usePlayerStore((s) => s.currentTrackIndex)
+  const currentTime          = usePlayerStore((s) => s.currentTime)
+  const duration             = usePlayerStore((s) => s.duration)
+  const ejectCassette        = usePlayerStore((s) => s.ejectCassette)
+  const setPlaybackState     = usePlayerStore((s) => s.setPlaybackState)
+  const setVolume            = usePlayerStore((s) => s.setVolume)
+  const setQuality           = usePlayerStore((s) => s.setQuality)
+  const setCurrentTrackIndex = usePlayerStore((s) => s.setCurrentTrackIndex)
+  const setCurrentTime       = usePlayerStore((s) => s.setCurrentTime)
+  const setDuration          = usePlayerStore((s) => s.setDuration)
+  const setTempoFilter       = usePlayerStore((s) => s.setTempoFilter)
+  const setEnergyFilter      = usePlayerStore((s) => s.setEnergyFilter)
+  const setMoodFilter        = usePlayerStore((s) => s.setMoodFilter)
 
   const isPlaying = playbackState === 'playing'
 
