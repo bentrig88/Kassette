@@ -13,17 +13,17 @@ void main() { gl_Position = vec4(p, 0.0, 1.0); }
 `
 
 const FRAG = `
-precision highp float;
+precision mediump float;
 uniform float u_time;
 uniform vec2  u_res;
 uniform float u_intensity;
 
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
 // composite b OVER a (straight alpha)
 vec4 over(vec4 a, vec4 b) {
   float oa = b.a + a.a * (1.0 - b.a);
-  vec3  oc = (b.rgb * b.a + a.rgb * a.a * (1.0 - b.a)) / max(oa, 1e-4);
+  vec3  oc = (b.rgb * b.a + a.rgb * a.a * (1.0 - b.a)) / max(oa, 0.0001);
   return vec4(oc, oa);
 }
 
@@ -64,7 +64,8 @@ void main() {
 
   // global flicker
   float flick = (hash(vec2(floor(t * 20.0), 7.0)) - 0.5) * 0.08 * I;
-  col = over(col, flick < 0.0 ? vec4(0.0, 0.0, 0.0, -flick) : vec4(1.0, 1.0, 1.0, flick));
+  vec4 flickC = flick < 0.0 ? vec4(0.0, 0.0, 0.0, -flick) : vec4(1.0, 1.0, 1.0, flick);
+  col = over(col, flickC);
 
   // vignette
   float vig = smoothstep(0.85, 0.35, length(uv - 0.5));
