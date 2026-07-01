@@ -111,18 +111,6 @@ input[type='range'] {
   animation: vhs-glitch var(--vhs-glitch-speed, 1.7s) steps(9) infinite;
 }
 
-/* Bright rolling scan bar drifting down */
-.vhs-bar {
-  left: 0;
-  right: 0;
-  height: 22%;
-  background: linear-gradient(to bottom,
-    transparent, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.16),
-    rgba(255, 255, 255, 0.10), transparent);
-  opacity: var(--vhs-bar-op, 1);
-  animation: vhs-bar var(--vhs-bar-speed, 7s) linear infinite;
-}
-
 /* Fine dark scanlines */
 .vhs-scanlines {
   inset: 0;
@@ -151,10 +139,6 @@ input[type='range'] {
   0%, 100% { transform: translateX(0); }
   33%      { transform: translateX(-1.5%); }
   66%      { transform: translateX(1%); }
-}
-@keyframes vhs-bar {
-  0%   { transform: translateY(-30%); }
-  100% { transform: translateY(130%); }
 }
 @keyframes vhs-flicker {
   0%, 100% { opacity: 1; }

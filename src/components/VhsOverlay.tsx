@@ -9,7 +9,6 @@ export function VhsOverlay() {
     <div className="vhs-overlay" aria-hidden="true">
       <div className="vhs-grain" />
       <div className="vhs-glitch" />
-      <div className="vhs-bar" />
       <div className="vhs-scanlines" />
       <div className="vhs-vignette" />
     </div>
