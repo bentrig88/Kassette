@@ -83,8 +83,11 @@ input[type='range'] {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: clamp(160px, 22vw, 300px);
-  height: clamp(160px, 22vw, 300px);
+  width: clamp(240px, 30vw, 440px);
+  height: clamp(240px, 30vw, 440px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: opacity 0.4s ease;
 }
 .auth-intro--fade .auth-intro-logo {
