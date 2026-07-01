@@ -70,6 +70,5 @@ export function usePreviewAnalysis(tracks: Track[]) {
     // Changing queue (new idKey) cancels the in-flight run and starts a fresh
     // one for the new set, so a subgenre filter's tracks get analyzed promptly.
     return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idKey, addFeatures])
 }

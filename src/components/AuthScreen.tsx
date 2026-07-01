@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
 import { VhsOverlay } from './VhsOverlay'
 import { VhsDebug } from './VhsDebug'
@@ -13,6 +13,58 @@ export function AuthScreen() {
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { vals, set } = useVhsParams()
+
+  // Randomized displacement-band motion: move to a random spot, pause, move
+  // again (up or down), occasionally slip off-screen — driven via rAF so it's
+  // unpredictable rather than a fixed CSS loop. Writes --vhs-band-top (%).
+  const bandSpeedRef = useRef(vals.bandSpeed)
+  useEffect(() => { bandSpeedRef.current = vals.bandSpeed }, [vals.bandSpeed])
+  useEffect(() => {
+    const root = document.documentElement
+    let raf = 0
+    let cancelled = false
+    let pos = 120       // start hidden below the screen
+    let from = 120
+    let to = 120
+    let phase: 'hold' | 'move' = 'hold'
+    let phaseStart = 0
+    let phaseDur = 0
+
+    const rand = (a: number, b: number) => a + Math.random() * (b - a)
+
+    function plan(now: number) {
+      if (phase === 'move') {
+        // just arrived — hold here for a random beat
+        phase = 'hold'
+        from = pos
+        to = pos
+        phaseDur = rand(500, 2800)
+      } else {
+        // choose a new destination (random, up or down) or slip off-screen
+        phase = 'move'
+        from = pos
+        to = Math.random() < 0.28 ? (Math.random() < 0.5 ? -25 : 125) : rand(-10, 110)
+        const dist = Math.abs(to - from)
+        phaseDur = Math.max(180, (dist / 100) * bandSpeedRef.current * 1000 * rand(0.5, 1.5))
+      }
+      phaseStart = now
+    }
+
+    function frame(now: number) {
+      if (cancelled) return
+      if (phaseDur === 0) plan(now)
+      const t = Math.min(1, (now - phaseStart) / phaseDur)
+      if (phase === 'move') {
+        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2 // easeInOut
+        pos = from + (to - from) * e
+      }
+      root.style.setProperty('--vhs-band-top', `${pos.toFixed(2)}%`)
+      if (t >= 1) plan(now)
+      raf = requestAnimationFrame(frame)
+    }
+    raf = requestAnimationFrame(frame)
+    return () => { cancelled = true; cancelAnimationFrame(raf) }
+  }, [])
 
   async function handleConnect() {
     setConnecting(true)
