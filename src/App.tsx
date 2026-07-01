@@ -49,7 +49,6 @@ export default function App() {
   const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
   const cassettes = useMusicStore((s) => s.cassettes)
-  const featuresMap = usePlayerStore((s) => s.featuresMap)
   const { vals: vhsVals, set: setVhs } = useVhsParams()
   const [introDone, setIntroDone] = useState(false)
   const [loadingComplete, setLoadingComplete] = useState(false)
@@ -185,7 +184,6 @@ export default function App() {
           libraryProgress={loadingProgress}
           libraryDone={!isLoading && loadingProgress >= 100}
           tracksPool={tracksSoFar}
-          featuresMap={featuresMap}
           onComplete={() => setLoadingComplete(true)}
         />
       )}

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Track } from '../types/music'
-import type { TrackFeatures } from '../services/featureCache'
 import { buildNormalizer } from '../services/featureNormalize'
 import { useAssetPreloader } from '../hooks/useAssetPreloader'
 import { LoadingTape } from './LoadingTape'
 import type { ScreenTrack, ScreenMeta } from './TrackScreen'
 import authBg from '../assets/auth/auth-background.webp'
+import { usePlayerStore } from '../store/playerStore'
 
 const INTRO_MS = 1000        // red phase duration before crossfade to concrete
 const CYCLE_MS = 450         // LCD track cycle interval
@@ -15,7 +15,6 @@ interface Props {
   libraryProgress: number   // 0–100
   libraryDone: boolean
   tracksPool: Track[]
-  featuresMap: Map<string, TrackFeatures>
   onComplete: () => void
 }
 
@@ -24,7 +23,8 @@ function randInt(min: number, max: number) {
   return Math.floor(min + Math.random() * (max - min + 1))
 }
 
-export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, featuresMap, onComplete }: Props) {
+export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComplete }: Props) {
+  const featuresMap = usePlayerStore((s) => s.featuresMap)
   const [phase, setPhase] = useState<'red' | 'concrete'>('red')
   const [exiting, setExiting] = useState(false)
   const [now, setNow] = useState<ScreenTrack | null>(null)
