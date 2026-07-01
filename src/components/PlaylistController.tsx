@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { sortTracksByFilters } from '../services/appleMusic'
+import { buildNormalizer } from '../services/featureNormalize'
 import { SubgenreSelect } from './SubgenreSelect'
 
 interface SliderProps {
@@ -42,6 +43,7 @@ export function PlaylistController() {
   const setEnergyFilter = usePlayerStore((s) => s.setEnergyFilter)
   const setMoodFilter = usePlayerStore((s) => s.setMoodFilter)
   const featuresMap = usePlayerStore((s) => s.featuresMap)
+  const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
   const queuedTracks = usePlayerStore((s) => s.queuedTracks)
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
@@ -95,7 +97,7 @@ export function PlaylistController() {
 
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
-      const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood)
+      const sortedUpcoming = sortTracksByFilters(candidates, featuresMap, tempo, energy, mood, normalizer)
       const newQueue = [...played, ...sortedUpcoming]
       setQueuedTracks(newQueue)
 
@@ -106,7 +108,7 @@ export function PlaylistController() {
         setCurrentTrackIndex(0)
       }
     },
-    [isInserted, playbackState, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, setQueuedTracks, setCurrentTrackIndex]
+    [isInserted, playbackState, baseQueue, currentCassette, queuedTracks, currentTrackIndex, featuresMap, normalizer, setQueuedTracks, setCurrentTrackIndex]
   )
 
   function handleTempo(v: number) {
@@ -129,9 +131,14 @@ export function PlaylistController() {
     applyAll(tempoFilter, energyFilter, moodFilter, next, true)
   }
 
-  const upcoming = (queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? []))
-    .slice(currentTrackIndex + 1)
-  const analyzedUpcoming = upcoming.filter((t) => featuresMap.has(t.id)).length
+  const upcoming = useMemo(
+    () => (queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])).slice(currentTrackIndex + 1),
+    [queuedTracks, currentCassette, currentTrackIndex]
+  )
+  const analyzedUpcoming = useMemo(
+    () => upcoming.filter((t) => featuresMap.has(t.id)).length,
+    [upcoming, featuresMap]
+  )
   const enoughData = analyzedUpcoming >= Math.min(5, upcoming.length)
   const disabled = !isInserted || !enoughData
 

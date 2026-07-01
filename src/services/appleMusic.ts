@@ -217,7 +217,8 @@ export function sortTracksByFilters(
   featuresMap: Map<string, import('../services/featureCache').TrackFeatures>,
   tempo: number,
   energy: number,
-  mood: number
+  mood: number,
+  normalizer?: import('../services/featureNormalize').FeatureNormalizer
 ): Track[] {
   const analyzed: Track[] = []
   const unanalyzed: Track[] = []
@@ -233,7 +234,7 @@ export function sortTracksByFilters(
 
   // Normalize each track's raw features to its percentile rank within the library
   // (precomputed once so the comparator stays O(1) per pair).
-  const norm = buildNormalizer(featuresMap)
+  const norm = normalizer ?? buildNormalizer(featuresMap)
   const normCache = new Map<string, NormalizedFeatures>()
   for (const t of analyzed) normCache.set(t.id, norm.normalize(featuresMap.get(t.id)!))
 
