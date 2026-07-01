@@ -52,6 +52,21 @@ input[type='range'] {
   font-family: 'Afacad', sans-serif;
 }
 
+/* Stage: real content, warped by the SVG horizontal-displacement filter */
+.auth-stage {
+  position: absolute;
+  inset: 0;
+  filter: url(#vhs-displace);
+}
+
+/* Hidden host for the SVG filter definition */
+.vhs-svg {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 /* ─── VHS glitch overlay (CSS/SVG) — on top, click-through ──── */
 .vhs-overlay {
   position: absolute;

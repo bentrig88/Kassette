@@ -22,7 +22,7 @@ const PARAMS: Param[] = [
   { key: 'scanGap', label: 'Scanline gap', cssVar: '--vhs-scan-gap', min: 2, max: 8, step: 1, def: 3, unit: 'px' },
   { key: 'glitch', label: 'Glitch', cssVar: '--vhs-glitch-op', min: 0, max: 1, step: 0.01, def: 0.7 },
   { key: 'glitchSpeed', label: 'Glitch speed', cssVar: '--vhs-glitch-speed', min: 0.3, max: 4, step: 0.1, def: 1.7, unit: 's' },
-  { key: 'bar', label: 'Scan bar', cssVar: '--vhs-bar-op', min: 0, max: 1, step: 0.05, def: 1 },
+  { key: 'bar', label: 'Scan bar', cssVar: '--vhs-bar-op', min: 0, max: 1, step: 0.05, def: 0.3 },
   { key: 'barSpeed', label: 'Bar speed', cssVar: '--vhs-bar-speed', min: 2, max: 15, step: 0.5, def: 7, unit: 's' },
   { key: 'vignette', label: 'Vignette', cssVar: '--vhs-vig-op', min: 0, max: 1, step: 0.05, def: 1 },
   { key: 'flicker', label: 'Flicker floor', cssVar: '--vhs-flicker-min', min: 0.6, max: 1, step: 0.01, def: 0.9 },
