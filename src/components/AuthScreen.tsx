@@ -31,8 +31,10 @@ export function AuthScreen() {
       <div className="auth-bg">
         <img src={authBg} alt="" />
       </div>
-      <img src={authTapeShadow} alt="" className="auth-tape-shadow" />
-      <img src={authTape} alt="" className="auth-tape" />
+      <div className="auth-tape-wrap">
+        <img src={authTapeShadow} alt="" className="auth-tape-shadow" />
+        <img src={authTape} alt="" className="auth-tape" />
+      </div>
       <img src={authRedBack} alt="" className="auth-red" />
 
       <div className="auth-content">

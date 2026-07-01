@@ -69,23 +69,9 @@ input[type='range'] {
   background: linear-gradient(to bottom, #fff 41%, rgba(255, 255, 255, 0) 75%);
 }
 
-/* Ground shadow under the tape — thin, blurred; centered in the right half */
-.auth-tape-shadow {
-  position: absolute;
-  z-index: 1;
-  left: 75%;
-  top: 72%;
-  transform: translateX(-50%);
-  width: 42%;
-  height: 7%;
-  object-fit: fill;
-  opacity: 0.3;
-  filter: blur(16px);
-  pointer-events: none;
-}
-
-/* Hero cassette + pencil — centered in the right half (50–100% → center 75%) */
-.auth-tape {
+/* Tape + shadow container — centered in the right half (50–100% → center 75%).
+   Sizes the tape; the shadow is positioned relative to this box. */
+.auth-tape-wrap {
   position: absolute;
   z-index: 2;
   left: 75%;
@@ -93,8 +79,30 @@ input[type='range'] {
   transform: translate(-50%, -50%);
   width: 44%;
   max-width: 1000px;
-  height: auto;
   pointer-events: none;
+}
+
+/* Hero cassette + pencil — fills the wrapper */
+.auth-tape {
+  display: block;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: auto;
+}
+
+/* Ground shadow — anchored to the bottom of the tape, same width, thin + blurred */
+.auth-tape-shadow {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  bottom: 2%;
+  transform: translateX(-50%);
+  width: 96%;
+  aspect-ratio: 748 / 82;
+  object-fit: fill;
+  opacity: 0.3;
+  filter: blur(16px);
 }
 
 /* Diagonal red panel (SVG gradient, stretches — preserveAspectRatio none) */
