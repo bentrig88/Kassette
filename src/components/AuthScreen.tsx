@@ -76,6 +76,26 @@ export function AuthScreen({ vhs }: { vhs: Record<string, number> }) {
   async function handleConnect() {
     setConnecting(true)
     setError(null)
+    // MusicKit opens its auth window via window.open(); we don't call it
+    // ourselves, so to center that popup we temporarily wrap window.open and
+    // inject centered left/top (preserving MusicKit's requested width/height).
+    const originalOpen = window.open.bind(window)
+    window.open = ((url?: string | URL, target?: string, features?: string) => {
+      const num = (key: string, fallback: number) => {
+        const m = features?.match(new RegExp(`${key}\\s*=\\s*(\\d+)`))
+        return m ? parseInt(m[1], 10) : fallback
+      }
+      const w = num('width', 500)
+      const h = num('height', 700)
+      const baseLeft = window.screenLeft ?? window.screenX
+      const baseTop = window.screenTop ?? window.screenY
+      const vw = window.innerWidth || document.documentElement.clientWidth || screen.width
+      const vh = window.innerHeight || document.documentElement.clientHeight || screen.height
+      const left = Math.round(baseLeft + (vw - w) / 2)
+      const top = Math.round(baseTop + (vh - h) / 2)
+      const centered = `${features ? features + ',' : ''}width=${w},height=${h},left=${left},top=${top}`
+      return originalOpen(url as string, target ?? '_blank', centered)
+    }) as typeof window.open
     try {
       await configureMusicKit()
       await authorize()
@@ -86,6 +106,8 @@ export function AuthScreen({ vhs }: { vhs: Record<string, number> }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Connection failed')
       setConnecting(false)
+    } finally {
+      window.open = originalOpen
     }
   }
 

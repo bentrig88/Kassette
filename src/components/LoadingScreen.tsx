@@ -106,7 +106,10 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, featur
     >
       {/* Background layers: red (state 1) crossfades to concrete (state 2). */}
       <div className="ls-bg ls-bg-red" style={{ opacity: concrete ? 0 : 1 }} />
-      <div className="ls-bg ls-bg-concrete" style={{ opacity: concrete ? 1 : 0, backgroundImage: `url(${authBg})` }} />
+      <div className="ls-bg ls-bg-concrete" style={{ opacity: concrete ? 1 : 0 }}>
+        <div className="ls-bg-concrete-img" style={{ backgroundImage: `url(${authBg})` }} />
+        <div className="ls-bg-concrete-grad" />
+      </div>
 
       {/* Heading — fades in with the concrete phase. */}
       <div className="ls-heading" style={{ opacity: concrete ? 1 : 0 }}>
