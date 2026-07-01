@@ -82,16 +82,19 @@ input[type='range'] {
   pointer-events: none;
 }
 
-/* Hero cassette + pencil — fills the wrapper */
+/* Hero cassette + pencil — fills the wrapper, slowly levitates up/down */
 .auth-tape {
   display: block;
   position: relative;
   z-index: 1;
   width: 100%;
   height: auto;
+  animation: auth-tape-float 5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  will-change: transform;
 }
 
-/* Ground shadow — anchored to the bottom of the tape, same width, thin + blurred */
+/* Ground shadow — anchored to the bottom of the tape, same width, thin + blurred.
+   Shrinks + fades slightly as the tape rises (same 5s timing/easing). */
 .auth-tape-shadow {
   position: absolute;
   z-index: 0;
@@ -103,6 +106,18 @@ input[type='range'] {
   object-fit: fill;
   opacity: 0.3;
   filter: blur(16px);
+  animation: auth-shadow-float 5s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes auth-tape-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3%); }
+}
+
+@keyframes auth-shadow-float {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.3; }
+  50%      { transform: translateX(-50%) scale(0.9); opacity: 0.2; }
 }
 
 /* Diagonal red panel (SVG gradient, stretches — preserveAspectRatio none) */
