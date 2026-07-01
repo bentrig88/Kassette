@@ -76,5 +76,5 @@ console.log(`Size: ${W}×${H}px (@${SCALE}x)`)
 
 // Convert to WebP — this is the shipped format imported by cassetteAssets.ts
 const OUT_WEBP = OUT_PNG.replace(/\.png$/, '.webp')
-execSync(`/opt/homebrew/bin/cwebp -q 90 "${OUT_PNG}" -o "${OUT_WEBP}"`, { stdio: 'inherit' })
+execSync(`cwebp -q 90 "${OUT_PNG}" -o "${OUT_WEBP}"`, { stdio: 'inherit' })
 console.log(`WebP written to ${OUT_WEBP}`)
