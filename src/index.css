@@ -2380,3 +2380,56 @@ input[type='range'] {
   border-radius: 3px;
   transition: width 0.25s ease;
 }
+
+/* ── Loading screen (post-auth library load) ─────────────── */
+.ls-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ls-bg {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.6s ease;
+}
+.ls-bg-red {
+  background: linear-gradient(180deg, #E20025 0%, #ff2937 100%);
+}
+.ls-bg-concrete {
+  background-size: cover;
+  background-position: center;
+}
+.ls-heading {
+  position: absolute;
+  top: 12%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
+}
+.ls-heading-top {
+  font-family: 'Afacad', sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  color: #E20025;
+  text-transform: uppercase;
+}
+.ls-heading-main {
+  font-family: 'Afacad', sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  letter-spacing: 0.01em;
+  color: #1a1414;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+.ls-tape-wrap {
+  position: relative;
+  z-index: 2;
+}
