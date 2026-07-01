@@ -18,7 +18,13 @@ export function AuthScreen() {
   // again (up or down), occasionally slip off-screen — driven via rAF so it's
   // unpredictable rather than a fixed CSS loop. Writes --vhs-band-top (%).
   const bandSpeedRef = useRef(vals.bandSpeed)
-  useEffect(() => { bandSpeedRef.current = vals.bandSpeed }, [vals.bandSpeed])
+  const bandMinRef = useRef(vals.bandThickMin)
+  const bandMaxRef = useRef(vals.bandThickMax)
+  useEffect(() => {
+    bandSpeedRef.current = vals.bandSpeed
+    bandMinRef.current = vals.bandThickMin
+    bandMaxRef.current = vals.bandThickMax
+  }, [vals.bandSpeed, vals.bandThickMin, vals.bandThickMax])
   useEffect(() => {
     const root = document.documentElement
     let raf = 0
@@ -46,6 +52,10 @@ export function AuthScreen() {
         to = Math.random() < 0.28 ? (Math.random() < 0.5 ? -25 : 125) : rand(-10, 110)
         const dist = Math.abs(to - from)
         phaseDur = Math.max(180, (dist / 100) * bandSpeedRef.current * 1000 * rand(0.5, 1.5))
+        // fresh random thickness for this pass (within min/max)
+        const lo = Math.min(bandMinRef.current, bandMaxRef.current)
+        const hi = Math.max(bandMinRef.current, bandMaxRef.current)
+        root.style.setProperty('--vhs-band-h', `${rand(lo, hi).toFixed(2)}%`)
       }
       phaseStart = now
     }
