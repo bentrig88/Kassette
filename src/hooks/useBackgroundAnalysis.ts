@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
-import { getFeatures, setFeatures } from '../services/featureCache'
+import { getFeatures, setFeatures, getAllKeys } from '../services/featureCache'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
 
@@ -29,11 +29,9 @@ export function useBackgroundAnalysis(tracks: Track[]) {
       await new Promise((r) => setTimeout(r, 10_000))
       if (cancelled) return
 
-      // Filter to uncached tracks only
-      const uncached: Track[] = []
-      for (const t of tracks) {
-        if (await getFeatures(t.id) === null) uncached.push(t)
-      }
+      // Filter to uncached tracks only (one key read, not N round-trips)
+      const have = await getAllKeys()
+      const uncached = tracks.filter((t) => !have.has(t.id))
       if (cancelled || uncached.length === 0) return
 
       console.log(`[Kassette] Background analysis: ${uncached.length} tracks to analyze`)

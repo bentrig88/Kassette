@@ -15,8 +15,11 @@ const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
 const VERSION = 6 // bumped: BPM now spectral-flux + tempo prior (was energy-envelope) — re-analyze
 
+let _dbPromise: Promise<IDBDatabase> | null = null
+
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  if (_dbPromise) return _dbPromise
+  _dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION)
     req.onupgradeneeded = () => {
       const db = req.result
@@ -26,6 +29,7 @@ function openDB(): Promise<IDBDatabase> {
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
+  return _dbPromise
 }
 
 export async function getFeatures(id: string): Promise<TrackFeatures | null> {
@@ -58,6 +62,16 @@ export async function getAllFeatures(): Promise<Map<string, TrackFeatures>> {
       for (const f of req.result) map.set(f.id, f)
       resolve(map)
     }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+export async function getAllKeys(): Promise<Set<string>> {
+  const db = await openDB()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly')
+    const req = tx.objectStore(STORE).getAllKeys()
+    req.onsuccess = () => resolve(new Set(req.result as string[]))
     req.onerror = () => reject(req.error)
   })
 }
