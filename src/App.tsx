@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { Track } from './types/music'
 import { useMusicStore } from './store/musicStore'
 import { usePlayerStore } from './store/playerStore'
 import {
@@ -16,6 +17,7 @@ import { CassetteCarousel } from './components/CassetteCarousel'
 import { CassettePlayer } from './components/CassettePlayer'
 import { PlaylistController } from './components/PlaylistController'
 import { SceneBackground } from './components/SceneBackground'
+import { LoadingScreen } from './components/LoadingScreen'
 import { VhsOverlay } from './components/VhsOverlay'
 import { VhsDebug } from './components/VhsDebug'
 import { useVhsParams } from './hooks/useVhsParams'
@@ -46,8 +48,12 @@ export default function App() {
   const setAllTracks = useMusicStore((s) => s.setAllTracks)
   const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
+  const cassettes = useMusicStore((s) => s.cassettes)
+  const featuresMap = usePlayerStore((s) => s.featuresMap)
   const { vals: vhsVals, set: setVhs } = useVhsParams()
   const [introDone, setIntroDone] = useState(false)
+  const [loadingComplete, setLoadingComplete] = useState(false)
+  const [tracksSoFar, setTracksSoFar] = useState<Track[]>([])
 
   useBackgroundAnalysis(allTracks)
   const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
@@ -84,8 +90,9 @@ export default function App() {
       setError(null)
 
       try {
-        const tracks = await fetchLibraryTracks((loaded, est) => {
+        const tracks = await fetchLibraryTracks((loaded, est, soFar) => {
           setLoadingProgress(Math.min(95, (loaded / est) * 95))
+          setTracksSoFar([...soFar])
         })
         const cassettes = buildCassettes(tracks)
         setCassettes(cassettes)
@@ -110,18 +117,6 @@ export default function App() {
         {!introDone && <AuthIntro onDone={() => setIntroDone(true)} />}
       </>
     )
-  } else if (isLoading) {
-    screen = (
-      <div className="loading-screen">
-        <div className="loading-card">
-          <div className="loading-title">Loading your library...</div>
-          <div className="loading-bar-container">
-            <div className="loading-bar" style={{ width: `${loadingProgress}%` }} />
-          </div>
-          <div className="loading-hint">Building your cassettes…</div>
-        </div>
-      </div>
-    )
   } else if (error) {
     screen = (
       <div className="loading-screen">
@@ -140,7 +135,7 @@ export default function App() {
         </div>
       </div>
     )
-  } else {
+  } else if (cassettes.length > 0) {
     screen = (
       <>
         <SceneBackground />
@@ -155,6 +150,8 @@ export default function App() {
               setAuthenticated(false)
               setCassettes([])
               setIntroDone(false) // replay the intro loader next time auth is shown
+              setLoadingComplete(false)
+              setTracksSoFar([])
             }}
           >
             Sign out
@@ -175,10 +172,23 @@ export default function App() {
       </>
     )
   }
+  // While the library is still fetching (authed, no error, cassettes not built
+  // yet), `screen` stays undefined — the opaque LoadingScreen overlay covers the
+  // viewport. Gating the player on cassettes.length > 0 also avoids a one-render
+  // race where the player would mount before loadLibrary populates the store.
 
   return (
     <>
       {screen}
+      {isAuthenticated && !error && !loadingComplete && (
+        <LoadingScreen
+          libraryProgress={loadingProgress}
+          libraryDone={!isLoading && loadingProgress >= 100}
+          tracksPool={tracksSoFar}
+          featuresMap={featuresMap}
+          onComplete={() => setLoadingComplete(true)}
+        />
+      )}
       {/* VHS overlay + tuning panel — on top of every screen, click-through */}
       <VhsOverlay />
       <VhsDebug vals={vhsVals} onChange={setVhs} />

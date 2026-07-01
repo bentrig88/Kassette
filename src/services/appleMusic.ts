@@ -52,7 +52,7 @@ export function isAuthorized(): boolean {
  * Apple Music API returns max 100 per page.
  */
 export async function fetchLibraryTracks(
-  onProgress?: (loaded: number, total: number) => void
+  onProgress?: (loaded: number, total: number, tracksSoFar: Track[]) => void
 ): Promise<Track[]> {
   const music = MusicKit.getInstance()
   const tracks: Track[] = []
@@ -74,9 +74,10 @@ export async function fetchLibraryTracks(
 
     if (response.data.next && items.length === limit) {
       offset += limit
-      onProgress?.(tracks.length, tracks.length + limit)
+      onProgress?.(tracks.length, tracks.length + limit, tracks)
     } else {
       hasMore = false
+      onProgress?.(tracks.length, tracks.length, tracks)
     }
 
     // Safety limit
