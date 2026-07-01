@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as PlayerAssets from '../assets/player/playerAssets'
 import * as CassetteAssets from '../assets/tapes/cassetteAssets'
-import { genreBackgroundMap } from '../assets/background/genreBackgrounds'
 import cassette0 from '../assets/tapes/cassette0-body-flat.webp'
 import bgGeneric from '../assets/background/background-generic.webp'
 import obj1 from '../assets/background/object-generic-1.webp'
@@ -37,7 +36,6 @@ export function useAssetPreloader(): { progress: number; done: boolean } {
   const urls = useMemo(() => Array.from(new Set([
     ...collectUrls(PlayerAssets as Record<string, unknown>),
     ...collectUrls(CassetteAssets as Record<string, unknown>),
-    ...Object.values(genreBackgroundMap),
     cassette0, bgGeneric, obj1, obj2, obj3, authBg, logoUrl,
   ].filter((u): u is string => typeof u === 'string' && u.length > 0))), [])
 

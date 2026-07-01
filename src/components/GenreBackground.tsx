@@ -92,6 +92,17 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
   const shiftX = useTransform(springX, [-1, 1], [`${MAX_SHIFT}%`, `${-MAX_SHIFT}%`])
   const shiftY = useTransform(springY, [-1, 1], [`${MAX_SHIFT}%`, `${-MAX_SHIFT}%`])
 
+  // Prefetch the focused background + its ring neighbors so navigation is
+  // seamless (these are no longer eagerly preloaded during the loading screen).
+  useEffect(() => {
+    if (n === 0) return
+    for (const di of [0, -1, 1]) {
+      const g = cassettes[((selectedIndex + di) % n + n) % n]?.genre
+      const url = g ? backgroundForGenre(g) : null
+      if (url) { const img = new Image(); img.src = url }
+    }
+  }, [cassettes, selectedIndex, n])
+
   useEffect(() => {
     function onMove(e: MouseEvent) {
       mvX.set((e.clientX / window.innerWidth) * 2 - 1)
