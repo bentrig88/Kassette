@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, useState } from 'react'
+import { memo, useCallback, useRef, useEffect, useState } from 'react'
 import { motion, useMotionValue, animate, AnimatePresence } from 'framer-motion'
 import type { AnimationPlaybackControls } from 'framer-motion'
 import { useMusicStore } from '../store/musicStore'
@@ -296,7 +296,7 @@ interface CassetteItemProps {
   isInsertTarget: boolean
 }
 
-function CassetteItem({ cassette, isSelected, isInserted, width, isInserting, selectedCassetteId, liftY, isInsertTarget }: CassetteItemProps) {
+function CassetteItemBase({ cassette, isSelected, isInserted, width, isInserting, selectedCassetteId, liftY, isInsertTarget }: CassetteItemProps) {
   const h = stableHash(cassette.id)
 
   // Independent per-cassette keyframe targets for x, y, rotate
@@ -360,3 +360,4 @@ function CassetteItem({ cassette, isSelected, isInserted, width, isInserting, se
     </div>
   )
 }
+const CassetteItem = memo(CassetteItemBase)

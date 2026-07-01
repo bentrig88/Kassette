@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
@@ -25,7 +25,7 @@ export function usePreviewAnalysis(tracks: Track[]) {
   // Re-run only when the SET of track ids changes — NOT on reorder. This way
   // subgenre filtering (different tracks) triggers fresh analysis, while slider
   // re-sorts (same tracks, new order) don't restart it.
-  const idKey = tracks.map((t) => t.id).slice().sort().join('|')
+  const idKey = useMemo(() => tracks.map((t) => t.id).slice().sort().join('|'), [tracks])
 
   useEffect(() => {
     const queue = tracksRef.current
