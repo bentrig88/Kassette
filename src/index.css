@@ -133,7 +133,7 @@ input[type='range'] {
   color: #fff;
   text-transform: uppercase;
   font-weight: 600;
-  font-size: clamp(2.4rem, 6.2vw, 7rem);
+  font-size: clamp(2.4rem, 6.2vw, 8rem);
   line-height: 0.9;
   letter-spacing: -0.04em;
 }
