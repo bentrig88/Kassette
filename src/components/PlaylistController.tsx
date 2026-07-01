@@ -137,7 +137,9 @@ export function PlaylistController() {
     () => upcoming.filter((t) => featuresMap.has(t.id)).length,
     [upcoming, featuresMap]
   )
-  const enoughData = analyzedUpcoming >= Math.min(5, upcoming.length)
+  // Also require ≥5 analyzed tracks library-wide so the percentile normalizer
+  // can actually rank (with ≤1 it returns a flat 50 and the sliders do nothing).
+  const enoughData = analyzedUpcoming >= Math.min(5, upcoming.length) && featuresMap.size >= 5
   const disabled = !isInserted || !enoughData
 
   return (
