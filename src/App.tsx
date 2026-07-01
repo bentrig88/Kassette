@@ -108,6 +108,18 @@ export default function App() {
     loadLibrary()
   }, [isAuthenticated, setLoading, setLoadingProgress, setError, setCassettes, setAllTracks])
 
+  const handleSignOut = async () => {
+    try {
+      getMusicKitInstance().stop()
+      await getMusicKitInstance().unauthorize()
+    } catch {/* */}
+    setAuthenticated(false)
+    setCassettes([])
+    setIntroDone(false) // replay the intro loader next time auth is shown
+    setLoadingComplete(false)
+    setTracksSoFar([])
+  }
+
   let screen
   if (!isAuthenticated) {
     screen = (
@@ -141,17 +153,7 @@ export default function App() {
         <div className="app">
           <button
             className="signout-btn signout-btn--floating"
-            onClick={async () => {
-              try {
-                getMusicKitInstance().stop()
-                await getMusicKitInstance().unauthorize()
-              } catch {/* */}
-              setAuthenticated(false)
-              setCassettes([])
-              setIntroDone(false) // replay the intro loader next time auth is shown
-              setLoadingComplete(false)
-              setTracksSoFar([])
-            }}
+            onClick={handleSignOut}
           >
             Sign out
           </button>
@@ -169,6 +171,21 @@ export default function App() {
           </div>
         </div>
       </>
+    )
+  } else if (loadingComplete) {
+    // Authed, load finished, no error, but zero cassettes — no track matched a
+    // genre. The LoadingScreen overlay has unmounted, so show an empty state
+    // instead of a blank viewport.
+    screen = (
+      <div className="loading-screen">
+        <div className="loading-card">
+          <div className="loading-title">No cassettes to show</div>
+          <p style={{ marginBottom: '1rem' }}>
+            None of the tracks in your library matched a genre we recognize.
+          </p>
+          <button className="auth-button" onClick={handleSignOut}>Sign out</button>
+        </div>
+      </div>
     )
   }
   // While the library is still fetching (authed, no error, cassettes not built
