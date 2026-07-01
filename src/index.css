@@ -96,7 +96,7 @@ input[type='range'] {
   position: absolute;
   z-index: 0;
   left: 50%;
-  bottom: 2%;
+  bottom: -6%;
   transform: translateX(-50%);
   width: 96%;
   aspect-ratio: 748 / 82;
