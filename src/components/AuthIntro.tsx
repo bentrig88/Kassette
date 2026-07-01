@@ -3,6 +3,7 @@ import Lottie from 'lottie-react'
 import logoLoading from '../assets/auth/logo_loading.json'
 import logoReveal from '../assets/auth/logo_reveal.json'
 import redBack from '../assets/auth/auth-red-back.svg'
+import loadingTapeBack from '../assets/auth/loading_tape_back.png'
 import authBg from '../assets/auth/auth-background.jpg'
 import authTape from '../assets/auth/auth-tape.png'
 import authTapeShadow from '../assets/auth/auth-tape-shadow.png'
@@ -22,8 +23,15 @@ type Phase = 'loading' | 'reveal' | 'exit'
 export function AuthIntro({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [slide, setSlide] = useState(false)
+  const [started, setStarted] = useState(false)
   const assetsReadyRef = useRef(false)
   const fade = phase === 'exit'
+
+  // Fade the loading Lottie + tape shell in on first paint.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setStarted(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   // Preload the auth assets; flip the flag when all are done (or after a
   // safety timeout so we never hang the loader).
@@ -66,7 +74,15 @@ export function AuthIntro({ onDone }: { onDone: () => void }) {
   return (
     <div className={cls} aria-hidden="true">
       <img src={redBack} alt="" className="auth-intro-red" />
-      <div className="auth-intro-logo">
+      <img
+        src={loadingTapeBack}
+        alt=""
+        className={
+          'auth-intro-tape' +
+          (!started || phase !== 'loading' ? ' auth-intro-tape--hidden' : '')
+        }
+      />
+      <div className={'auth-intro-logo' + (started ? ' auth-intro-logo--in' : '')}>
         {phase === 'loading' ? (
           <Lottie animationData={logoLoading} loop autoplay onLoopComplete={handleLoadingLoop} />
         ) : (

@@ -90,11 +90,31 @@ input[type='range'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.4s ease, transform 0.45s ease-out;
+  opacity: 0;
+  transition: opacity 0.5s ease, transform 0.45s ease-out;
+}
+.auth-intro-logo--in {
+  opacity: 1;
 }
 .auth-intro--fade .auth-intro-logo {
   opacity: 0;
   transform: translate(-50%, -50%) scale(2);
+}
+
+/* Red cassette shell behind the loading Lottie; fades out on swap to reveal. */
+.auth-intro-tape {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(442px, 54.6vw, 806px);
+  height: auto;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.auth-intro-tape--hidden {
+  opacity: 0;
 }
 
 .auth-stage {
