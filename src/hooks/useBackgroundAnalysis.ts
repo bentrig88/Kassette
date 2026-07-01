@@ -3,6 +3,7 @@ import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures, getAllKeys } from '../services/featureCache'
+import { getSharedAudioContext, beginAnalysis, endAnalysis } from '../lib/analysisShared'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
 
@@ -46,16 +47,15 @@ export function useBackgroundAnalysis(tracks: Track[]) {
         for (const [id, url] of urls) previewMap.set(id, url)
       }
 
-      const audioCtx = new AudioContext()
+      const audioCtx = getSharedAudioContext()
 
       await mapPool(uncached, CONCURRENCY, async (track) => {
         // Skip if analyzed while we were fetching URLs (another lane / the
         // active-queue pass may have covered it).
         if (await getFeatures(track.id) !== null) return
-
         const url = previewMap.get(track.id)
         if (!url) return
-
+        if (!beginAnalysis(track.id)) return
         try {
           const res = await fetch(url)
           if (!res.ok) return
@@ -64,9 +64,8 @@ export function useBackgroundAnalysis(tracks: Track[]) {
           await setFeatures(features)
           addFeatures(features)
         } catch {/* skip on CORS or decode error */}
+        finally { endAnalysis(track.id) }
       }, () => cancelled)
-
-      await audioCtx.close().catch(() => {})
     }
 
     run()

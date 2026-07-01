@@ -3,6 +3,7 @@ import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures } from '../services/featureCache'
+import { getSharedAudioContext, beginAnalysis, endAnalysis } from '../lib/analysisShared'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
 
@@ -44,12 +45,12 @@ export function usePreviewAnalysis(tracks: Track[]) {
       const previewMap = await fetchPreviewUrls(uncached)
       if (cancelled) return
 
-      const audioCtx = new AudioContext()
+      const audioCtx = getSharedAudioContext()
 
       await mapPool(uncached, CONCURRENCY, async (track) => {
         const url = previewMap.get(track.id)
         if (!url) return
-
+        if (!beginAnalysis(track.id)) return   // another pass owns it
         try {
           const res = await fetch(url)
           if (!res.ok) return
@@ -58,12 +59,9 @@ export function usePreviewAnalysis(tracks: Track[]) {
           const features = await analyzeAudioBuffer(track.id, audioBuffer)
           await setFeatures(features)
           addFeatures(features)
-        } catch {
-          // CORS or decode error — skip this track
-        }
+        } catch {/* skip on CORS or decode error */}
+        finally { endAnalysis(track.id) }
       }, () => cancelled)
-
-      await audioCtx.close().catch(() => {})
     }
 
     run()
