@@ -27,7 +27,7 @@ function openDB(): Promise<IDBDatabase> {
       db.createObjectStore(STORE, { keyPath: 'id' })
     }
     req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
+    req.onerror = () => { _dbPromise = null; reject(req.error) }
   })
   return _dbPromise
 }
