@@ -54,9 +54,6 @@ export function LoadingTape({ progress, now, next, nowMeta, nextMeta }: Props) {
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
         </div>
 
-        {/* Window */}
-        <div className="ct-abs ct-window" />
-
         {/* Shared LCD, scaled into the tape's screen area */}
         <div className="loading-tape-screen">
           <TrackScreen

@@ -54,9 +54,6 @@ export function CassetteTapeBody({ cassette, reelSpeed = 0 }: Props) {
         />
       </div>
 
-      {/* Window — pure CSS, no image asset */}
-      <div className="ct-abs ct-window" />
-
       {/* Sticker — HTML/CSS, dynamic genre color + text */}
       <div className="ct-abs ct-sticker">
         <div className="ct-sticker-bar" style={{ background: cassette.color }} />
