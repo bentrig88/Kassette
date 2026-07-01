@@ -52,6 +52,45 @@ input[type='range'] {
   font-family: 'Afacad', sans-serif;
 }
 
+/* ─── Auth intro loader (Lottie + red diagonal cover) ─────── */
+.auth-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;   /* above the app-wide VHS overlay */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Red diagonal cover, oversized so its red fills the whole viewport
+   (diagonal edge sits off the right); slides left to reveal the auth screen. */
+.auth-intro-red {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 145vw;
+  display: block;
+  transform: translateX(0);
+  transition: transform 0.95s cubic-bezier(0.76, 0, 0.24, 1);
+}
+.auth-intro--slide .auth-intro-red {
+  transform: translateX(-150vw);
+}
+
+/* Centered Lottie (loading → reveal), fades out before the cover slides */
+.auth-intro-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(160px, 22vw, 300px);
+  height: clamp(160px, 22vw, 300px);
+  transition: opacity 0.4s ease;
+}
+.auth-intro--fade .auth-intro-logo {
+  opacity: 0;
+}
+
 .auth-stage {
   position: absolute;
   inset: 0;

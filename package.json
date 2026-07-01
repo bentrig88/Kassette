@@ -12,6 +12,7 @@
   "dependencies": {
     "@types/musickit-js": "^1.0.11",
     "framer-motion": "^12.35.0",
+    "lottie-react": "^2.4.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zustand": "^5.0.11"

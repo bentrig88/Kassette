@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useMusicStore } from './store/musicStore'
 import { usePlayerStore } from './store/playerStore'
 import {
@@ -11,6 +11,7 @@ import {
 import { getAllFeatures } from './services/featureCache'
 import { useBackgroundAnalysis } from './hooks/useBackgroundAnalysis'
 import { AuthScreen } from './components/AuthScreen'
+import { AuthIntro } from './components/AuthIntro'
 import { CassetteCarousel } from './components/CassetteCarousel'
 import { CassettePlayer } from './components/CassettePlayer'
 import { PlaylistController } from './components/PlaylistController'
@@ -46,6 +47,7 @@ export default function App() {
   const allTracks = useMusicStore((s) => s.allTracks)
   const setError = useMusicStore((s) => s.setError)
   const { vals: vhsVals, set: setVhs } = useVhsParams()
+  const [introDone, setIntroDone] = useState(false)
 
   useBackgroundAnalysis(allTracks)
   const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
@@ -102,7 +104,12 @@ export default function App() {
 
   let screen
   if (!isAuthenticated) {
-    screen = <AuthScreen vhs={vhsVals} />
+    screen = (
+      <>
+        <AuthScreen vhs={vhsVals} />
+        {!introDone && <AuthIntro onDone={() => setIntroDone(true)} />}
+      </>
+    )
   } else if (isLoading) {
     screen = (
       <div className="loading-screen">
@@ -147,6 +154,7 @@ export default function App() {
               } catch {/* */}
               setAuthenticated(false)
               setCassettes([])
+              setIntroDone(false) // replay the intro loader next time auth is shown
             }}
           >
             Sign out
