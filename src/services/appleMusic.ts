@@ -79,12 +79,6 @@ export async function fetchLibraryTracks(
       hasMore = false
       onProgress?.(tracks.length, tracks.length, tracks)
     }
-
-    // Safety limit
-
-    if (tracks.length >= 3000) {
-      hasMore = false
-    }
   }
 
   return tracks
@@ -174,8 +168,12 @@ export function buildCassettes(tracks: Track[]): Cassette[] {
 export async function loadCassetteQueue(cassette: Cassette, startIndex = 0): Promise<Track[]> {
   const music = MusicKit.getInstance()
 
-  // Shuffle then take the first 100 so every insert feels fresh
-  const shuffled = [...cassette.tracks].sort(() => Math.random() - 0.5)
+  // Shuffle (Fisher-Yates — uniform, unlike sort(()=>rand-0.5)) then take 100
+  const shuffled = [...cassette.tracks]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
   const slice = shuffled.slice(0, 100)
 
   // Use original MediaItems from cache — they carry cloudId set by MusicKit's API
