@@ -134,7 +134,7 @@ input[type='range'] {
   align-items: flex-start;
   gap: clamp(1rem, 2.4vh, 2.25rem);
   width: 100%;
-  padding-left: 2%;
+  padding-left: 3%;
   box-sizing: border-box;
 }
 
