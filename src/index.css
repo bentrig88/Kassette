@@ -324,6 +324,7 @@ input[type='range'] {
 
 .auth-button {
   align-self: flex-start;
+  margin-top: clamp(0.75rem, 2vh, 1.75rem);
   background: #fff;
   color: #e30126;
   border: none;

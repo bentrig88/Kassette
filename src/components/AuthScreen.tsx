@@ -111,7 +111,7 @@ export function AuthScreen({ vhs }: { vhs: Record<string, number> }) {
             feeling of holding your favorite soundtrack in your hands.
           </p>
           <button className="auth-button" onClick={handleConnect} disabled={connecting}>
-            {connecting ? 'Connecting…' : 'Continue with Apple'}
+            {connecting ? 'Connecting…' : 'Connect with Music'}
           </button>
           {error && <p className="auth-error">{error}</p>}
         </div>
