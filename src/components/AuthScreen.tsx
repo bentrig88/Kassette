@@ -59,21 +59,40 @@ export function AuthScreen() {
         </div>
       </div>
 
-      {/* Horizontal-displacement filter (SVG) — warps the stage's real pixels */}
+      {/* Displacement confined to a horizontal band that sweeps in/out of the
+          screen at irregular times. The map is neutral gray (= no displacement)
+          everywhere except a moving feFlood band filled with turbulence. */}
       <svg className="vhs-svg" aria-hidden="true">
-        <filter id="vhs-displace" x="-5%" y="0%" width="110%" height="100%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.000001 0.4" numOctaves={1} seed={2} result="n">
-            <animate attributeName="seed" dur="0.9s" values="2;6;1;8;3" repeatCount="indefinite" calcMode="discrete" />
+        <filter id="vhs-displace" x="-10%" y="-10%" width="120%" height="120%">
+          <feFlood floodColor="#808080" result="neutral" />
+          <feTurbulence type="fractalNoise" baseFrequency="0.00001 0.6" numOctaves={1} seed={4} result="turb">
+            <animate attributeName="seed" dur="0.5s" values="4;9;2;7;1" repeatCount="indefinite" calcMode="discrete" />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale={8} xChannelSelector="R" yChannelSelector="A">
+          {/* force turbulence alpha = 1 so the band fully replaces the neutral map */}
+          <feColorMatrix in="turb" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0 1" result="turbO" />
+          {/* the moving band mask (white strip, transparent elsewhere) */}
+          <feFlood floodColor="#ffffff" x="0%" width="100%" y="-20%" height="9%" result="bandmask">
             <animate
-              attributeName="scale"
-              dur="6s"
+              attributeName="y"
+              dur="8.5s"
               repeatCount="indefinite"
-              keyTimes="0;0.28;0.30;0.34;0.6;0.62;0.66;1"
-              values="6;6;34;6;6;54;6;6"
+              keyTimes="0;0.12;0.16;0.34;0.55;0.60;0.78;0.84;1"
+              values="-20%;-20%;75%;70%;-20%;-20%;40%;38%;110%"
             />
-          </feDisplacementMap>
+            <animate
+              attributeName="height"
+              dur="8.5s"
+              repeatCount="indefinite"
+              keyTimes="0;0.16;0.34;0.60;0.78;1"
+              values="7%;7%;13%;9%;16%;7%"
+            />
+          </feFlood>
+          <feComposite in="turbO" in2="bandmask" operator="in" result="bandturb" />
+          <feMerge result="map">
+            <feMergeNode in="neutral" />
+            <feMergeNode in="bandturb" />
+          </feMerge>
+          <feDisplacementMap in="SourceGraphic" in2="map" scale={35} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
 
