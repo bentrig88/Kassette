@@ -18,7 +18,8 @@ export interface VhsParam {
 }
 
 export const VHS_PARAMS: VhsParam[] = [
-  { key: 'dispScale', label: 'Displacement', min: 0, max: 80, step: 1, def: 30 },
+  { key: 'globalDisp', label: 'Global wobble', min: 0, max: 30, step: 1, def: 8 },
+  { key: 'dispScale', label: 'Band displacement', min: 0, max: 80, step: 1, def: 30 },
   { key: 'dispRough', label: 'Tear roughness', min: 0.1, max: 1.5, step: 0.05, def: 0.5 },
   { key: 'bandThickness', label: 'Band thickness', cssVar: '--vhs-band-h', unit: '%', min: 3, max: 25, step: 1, def: 8 },
   { key: 'bandSpeed', label: 'Band speed', cssVar: '--vhs-band-speed', unit: 's', min: 3, max: 20, step: 0.5, def: 9 },

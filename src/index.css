@@ -55,6 +55,7 @@ input[type='range'] {
 .auth-stage {
   position: absolute;
   inset: 0;
+  filter: url(#vhs-global);
 }
 
 /* Displaced copy, shown only inside a moving horizontal band (clip-path) */

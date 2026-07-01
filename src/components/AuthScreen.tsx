@@ -71,6 +71,14 @@ export function AuthScreen() {
 
       {/* Simple whole-layer horizontal displacement (applied to the glitch copy) */}
       <svg className="vhs-svg" aria-hidden="true">
+        {/* Gentle always-on wobble (whole base stage) */}
+        <filter id="vhs-global" x="-6%" y="-6%" width="112%" height="112%" colorInterpolationFilters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency={`0.00001 ${vals.dispRough}`} numOctaves={1} seed={5} result="ng">
+            <animate attributeName="seed" dur="0.6s" values="5;2;9;4;7" repeatCount="indefinite" calcMode="discrete" />
+          </feTurbulence>
+          <feDisplacementMap in="SourceGraphic" in2="ng" scale={vals.globalDisp} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+        {/* Strong displacement for the moving band copy */}
         <filter id="vhs-shift" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency={`0.00001 ${vals.dispRough}`} numOctaves={1} seed={3} result="n">
             <animate attributeName="seed" dur="0.4s" values="3;8;1;6;2" repeatCount="indefinite" calcMode="discrete" />
