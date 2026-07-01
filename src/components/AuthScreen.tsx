@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
 import { VhsOverlay } from './VhsOverlay'
 import { VhsDebug } from './VhsDebug'
+import { useVhsParams } from '../hooks/useVhsParams'
 import authBg from '../assets/auth/auth-background.jpg'
 import authRedBack from '../assets/auth/auth-red-back.svg'
 import authTape from '../assets/auth/auth-tape.png'
@@ -11,6 +12,7 @@ import authLogo from '../assets/auth/auth-logo.svg'
 export function AuthScreen() {
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { vals, set } = useVhsParams()
 
   async function handleConnect() {
     setConnecting(true)
@@ -70,15 +72,15 @@ export function AuthScreen() {
       {/* Simple whole-layer horizontal displacement (applied to the glitch copy) */}
       <svg className="vhs-svg" aria-hidden="true">
         <filter id="vhs-shift" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
-          <feTurbulence type="fractalNoise" baseFrequency="0.00001 0.5" numOctaves={1} seed={3} result="n">
+          <feTurbulence type="fractalNoise" baseFrequency={`0.00001 ${vals.dispRough}`} numOctaves={1} seed={3} result="n">
             <animate attributeName="seed" dur="0.4s" values="3;8;1;6;2" repeatCount="indefinite" calcMode="discrete" />
           </feTurbulence>
-          <feDisplacementMap in="SourceGraphic" in2="n" scale={30} xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale={vals.dispScale} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </svg>
 
       <VhsOverlay />
-      <VhsDebug />
+      <VhsDebug vals={vals} onChange={set} />
     </div>
   )
 }

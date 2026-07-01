@@ -62,19 +62,19 @@ input[type='range'] {
   filter: url(#vhs-shift);
   pointer-events: none;
   clip-path: inset(100% 0 0 0);
-  animation: vhs-band 9s linear infinite;
+  animation: vhs-band var(--vhs-band-speed, 9s) linear infinite;
   will-change: clip-path;
 }
 
 @keyframes vhs-band {
-  0%, 18%      { clip-path: inset(100% 0 0 0); }      /* hidden */
-  18.01%       { clip-path: inset(-8% 0 100% 0); }    /* enter at top... */
-  36%          { clip-path: inset(100% 0 -8% 0); }    /* ...travel down & exit */
-  36.01%, 58%  { clip-path: inset(100% 0 0 0); }      /* hidden */
-  58.01%       { clip-path: inset(-8% 0 100% 0); }
-  70%          { clip-path: inset(52% 0 40% 0); }     /* enters, stalls mid */
-  80%          { clip-path: inset(100% 0 -8% 0); }    /* exits */
-  80.01%, 100% { clip-path: inset(100% 0 0 0); }      /* hidden */
+  0%, 18%      { clip-path: inset(100% 0 0 0); }
+  18.01%       { clip-path: inset(calc(-1 * var(--vhs-band-h, 8%)) 0 100% 0); }         /* enter top */
+  36%          { clip-path: inset(100% 0 calc(-1 * var(--vhs-band-h, 8%)) 0); }         /* exit bottom */
+  36.01%, 58%  { clip-path: inset(100% 0 0 0); }
+  58.01%       { clip-path: inset(calc(-1 * var(--vhs-band-h, 8%)) 0 100% 0); }
+  70%          { clip-path: inset(52% 0 calc(48% - var(--vhs-band-h, 8%)) 0); }         /* stall mid */
+  80%          { clip-path: inset(100% 0 calc(-1 * var(--vhs-band-h, 8%)) 0); }
+  80.01%, 100% { clip-path: inset(100% 0 0 0); }
 }
 
 /* Hidden host for the SVG filter definition */
