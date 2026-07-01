@@ -15,6 +15,7 @@ The UI consists of three zones stacked vertically:
 - **Framer Motion v12** — carousel drag + cassette insert animation
 - **MusicKit JS v3** — loaded via CDN script tag in `index.html` (NOT via npm)
 - **Web Audio API** — tape quality filter (low-pass) + VU meter simulation
+- **lottie-react** — plays the pre-auth loader Lottie animations
 - Custom type declarations in `src/types/musickit.d.ts` for MusicKit v3 API
 
 ---
@@ -48,13 +49,17 @@ src/
     useButtonSFX.ts     One-shot SFX for transport button presses (reg + eject variants)
     useMotorSFX.ts      Looping motor SFX that runs while playbackState is playing or loading
     useDoorSFX.ts       One-shot SFX for door opening and tape inserting
+    useVhsParams.ts     Shared VHS overlay/displacement params (CSS vars + SVG attrs, localStorage)
   components/
-    AuthScreen.tsx          Apple Music connect UI
+    AuthScreen.tsx          Apple Music connect UI — Figma diagonal layout + tape hero + displacement
+    AuthIntro.tsx           Pre-auth Lottie loader (loading → reveal → red diagonal slides away)
     CassetteCarousel.tsx    Draggable genre cassette carousel (+ "CHOOSE YOUR GENRE" title)
     CassettePlayer.tsx      Main player: VU meter, tape bay, track display, controls
     PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
     SceneBackground.tsx     Persistent generic background + decorative objects (playback)
     GenreBackground.tsx     Per-genre tape-selection photo + diagonal wipe + mouse parallax
+    VhsOverlay.tsx          App-wide CSS/SVG VHS overlay (grain/scanlines/glitch/vignette/flicker)
+    VhsDebug.tsx            Dev 📼 panel: all VHS + displacement-band sliders (bottom-left)
     BackgroundDebug.tsx     Dev ⚙ panel: blur + dark-overlay sliders (CSS vars, localStorage)
     SubgenreSelect.tsx      Checkbox multi-select dropdown for the Mixtape Filters subgenre picker
   assets/
@@ -75,6 +80,14 @@ src/
       playerAssets.ts
     misc/
       logo.svg                      Player bottom-left logo (replaces 3-stripe composite)
+    auth/
+      auth-background.jpg           Concrete hero background (right side of auth screen)
+      auth-tape.png                 Red cassette + pencil hero
+      auth-tape-shadow.png          Tape ground shadow
+      auth-red-back.svg             Diagonal red gradient panel (auth + intro cover)
+      auth-logo.svg                 Kassette wordmark
+      logo_loading.json             Lottie — looping loader (solid red/cream, no gradient)
+      logo_reveal.json              Lottie — one-shot reveal (gradient stops recolored to brand)
     background/
       background-generic.jpg
       object-generic-1/2/3.png
@@ -484,6 +497,34 @@ Stacked column centered above the tapes (`.carousel-header`, fades with the caro
 ### Player logo & chrome
 - Player logo (`.np-logo`, bottom-left) is now a single `src/assets/misc/logo.svg` (`width:120px; left:17px; top:465px`), replacing the old 3-stripe (reel-icon + KASSETTE text) composite.
 - **Top nav bar removed** (`.app-header`/`.app-logo` deleted). Sign Out is now a floating `.signout-btn--floating` (`position:fixed`, top-right, `z-index:40`): bigger uppercase Afacad pill (`border-radius:9999px`) with a strong `backdrop-filter: blur(20px)` translucent fill.
+
+---
+
+## Auth Screen (Phase 3 — Figma node 49:2)
+Full-bleed diagonal layout (assets in `src/assets/auth/`, exported via Figma MCP):
+- **Left**: diagonal red gradient panel (`auth-red-back.svg`, `#E20025→#FF2937`) at `.auth-red` width 54%. On top, `.auth-content` (centered in the red at `left:27%`) holds the Kassette wordmark, the big uppercase Afacad headline "ANALOG SOUL FOR A DIGITAL STREAM", body copy (`#2f0004`), and the connect button.
+- **Right**: concrete `auth-background.jpg` (opacity 0.4 + white top gradient) with the `auth-tape.png` cassette-and-pencil hero centered in the right half; the tape **levitates** (5s ease-in-out) and its shadow (`.auth-tape-shadow`, anchored in `.auth-tape-wrap`) shrinks/fades in sync.
+- **Connect button** (`.auth-button`): white pill, red text, hover = lighter + `scale(1.06)` + softer shadow. Label is **"CONNECT WITH  MUSIC"** — an inline Apple-logo SVG (`fill: currentColor`) sits between "with" and "Music" since Afacad has no Apple glyph.
+- Sizing is responsive via `clamp()`/`vw`. Auth+reload flow unchanged (see the 403 fix note below).
+
+### Pre-auth intro loader (`AuthIntro.tsx`, lottie-react)
+Shown over the auth screen on first load and after Sign Out (App `introDone` state):
+1. Full-red diagonal cover (`auth-red-back.svg` sized `116vw × 215vh` — same 54:100 ratio as `.auth-red` so the **diagonal angle matches**, scaled to cover the screen) with `logo_loading` Lottie centered, looping.
+2. Meanwhile the auth assets preload (`new Image()`), with a 6s safety timeout.
+3. When ready, the loading loop finishes then swaps to `logo_reveal` (played once).
+4. On reveal complete: the Lottie **fades + scales to 2×** (ease-out), then the red cover **slides left** (diagonal wipe) revealing the auth screen; then it unmounts.
+- **Lottie color note**: `logo_reveal` shipped with grayscale (white→black) gradient stops on the mark; recolored per shape layer to brand — Shape Layer 7 `E20025→FFFDBC`, "top and bottom 2" 3-stop `FFFDBC→E20025→FFFDBC`, Shape Layer 4 `EC585A→FFFDBC`. `logo_loading` uses solid fills (no gradient).
+
+## VHS Effect
+Two independent effects, both authored in this session:
+- **Overlay** (`VhsOverlay.tsx`) — **app-wide** (rendered at App root, `z-index:60`, `pointer-events:none`). Pure CSS/SVG layers: SVG-turbulence grain, colored glitch tear-bands, fine scanlines, vignette, flicker. Every value is a CSS var (`--vhs-*`) so it's tunable. (Was originally WebGL — dropped because repeated HMR exhausted the browser's WebGL context limit, breaking shader compiles.)
+- **Displacement** (`AuthScreen` only) — real pixel warping via SVG `feDisplacementMap` (`colorInterpolationFilters="sRGB"` — critical, else mid-gray linearizes and offsets everything):
+  - `#vhs-global` — gentle always-on wobble on the base `.auth-stage`.
+  - `#vhs-shift` — strong displacement on a **duplicated** `.auth-stage--glitch` copy, revealed only inside a horizontal band via `clip-path` (`--vhs-band-top`/`--vhs-band-h`). The band's position + thickness are driven by a **JS random state machine** in AuthScreen (move/hold/reverse/slip-off-screen) via rAF. Kept auth-only: the band needs a duplicated static copy and a full-app displacement filter would break the player's glass panels + offset click targets.
+- **Params + debug**: `useVhsParams` (shared hook) writes CSS-var params to `:root` and exposes SVG-only params (displacement scale/roughness, band speed/thickness min-max) to AuthScreen; persists to localStorage. `VhsDebug` (📼, bottom-left) is the tuning panel for all of them.
+
+## Key finding — 403 on library load right after connect
+In the session where the user just authorized, MusicKit's `api` pipeline doesn't attach the Music User Token to `/v1/me/library/*` requests (immediate fetch → 403; re-authorizing in-session doesn't help — only a full page load does). Fix: `AuthScreen.handleConnect` calls `window.location.reload()` right after `authorize()` — the token is already persisted, so the reload restores the session via the known-good path.
 
 ---
 
