@@ -32,19 +32,21 @@ src/
   services/
     appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
     audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, spectral flux + tempo prior, centroid, chroma, KS key); runs in the worker
-    analysisClient.ts   Main-thread worker owner: resample (11kHz mono) + RPC → analyzeAudioBuffer()
-    featureCache.ts     IndexedDB cache (kassette-features v5) for raw TrackFeatures
+    analysisClient.ts   Main-thread DSP worker POOL (round-robin, up to 4 workers): resample (11kHz mono) + RPC → analyzeAudioBuffer()
+    featureCache.ts     IndexedDB cache (kassette-features v6); connection cached module-level; getAllKeys() for bulk existence check
     featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
   workers/
-    analysis.worker.ts  Dedicated worker: runs analyzePCM off the main thread
+    analysis.worker.ts  Analysis worker (one instance per pool slot): runs analyzePCM off the main thread
   lib/
     mapPool.ts          Bounded-concurrency async pool (used by the analysis hooks)
+    analysisShared.ts   Shared long-lived AudioContext + in-flight Set (beginAnalysis/endAnalysis) across both analysis passes
   hooks/
     useKeyboardNav.ts   Left/right arrow key navigation for carousel
     useVUMeter.ts       Simulated animated VU meter bars
     useAudioFilter.ts   Web Audio low-pass filter for tape quality simulation
     usePreviewAnalysis.ts   Analyzes the active queue's previews (concurrency pool)
-    useBackgroundAnalysis.ts Analyzes the rest of the library after a 10s delay (concurrency pool)
+    useBackgroundAnalysis.ts Analyzes the rest of the library after a 10s delay; uses getAllKeys() bulk check
+    useAssetPreloader.ts    Preloads all UI images in parallel; returns { progress: 0–1, done }
     useRewindSFX.ts     SFX chain for fast-backward (start → loop → end)
     useButtonSFX.ts     One-shot SFX for transport button presses (reg + eject variants)
     useMotorSFX.ts      Looping motor SFX that runs while playbackState is playing or loading
@@ -53,6 +55,10 @@ src/
   components/
     AuthScreen.tsx          Apple Music connect UI — Figma diagonal layout + tape hero + displacement
     AuthIntro.tsx           Pre-auth Lottie loader (loading → reveal → red diagonal slides away)
+    LoadingScreen.tsx       Post-auth library loading overlay (red → concrete crossfade, cycling LCD)
+    LoadingTape.tsx         Cassette tape for the loading screen (reels spin, LCD cycles, loading bar)
+    TrackScreen.tsx         Presentational now/next LCD — shared by CassettePlayer + LoadingTape
+    TrackDisplay.tsx        Owns featuresMap subscription + normalizer; renders TrackScreen for player
     CassetteCarousel.tsx    Draggable genre cassette carousel (+ "CHOOSE YOUR GENRE" title)
     CassettePlayer.tsx      Main player: VU meter, tape bay, track display, controls
     PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
@@ -64,34 +70,36 @@ src/
     SubgenreSelect.tsx      Checkbox multi-select dropdown for the Mixtape Filters subgenre picker
   assets/
     tapes/
-      cassette-body-flat.png        Flattened PNG composite of all static cassette body layers (@2x)
-      cassette2-body-flat.png       … cassette style variants (2–8, one per genre)
-      cassette3-body-flat.png
-      cassette4-body-flat.png
-      cassette5-body-flat.png
-      cassette6-body-flat.png
-      cassette7-body-flat.png
-      cassette8-body-flat.png
+      cassette0-body-flat.webp      Loading-screen cassette body (neutral/no-genre style)
+      cassette-body-flat.webp       Flattened WebP body for Rock (cassette1 = default)
+      cassette2-body-flat.webp      … cassette style variants (2–8, one per genre)
+      cassette3-body-flat.webp
+      cassette4-body-flat.webp
+      cassette5-body-flat.webp
+      cassette6-body-flat.webp
+      cassette7-body-flat.webp
+      cassette8-body-flat.webp
       cassette-reel-left.svg
       cassette-reel-right.svg
-      cassetteAssets.ts             Imports + genreBodyMap (genre → body PNG)
+      cassetteAssets.ts             Imports + genreBodyMap (genre → body WebP)
     player/
       player-*.svg / player-*.png   32 player UI assets
       playerAssets.ts
     misc/
       logo.svg                      Player bottom-left logo (replaces 3-stripe composite)
     auth/
-      auth-background.jpg           Concrete hero background (right side of auth screen)
-      auth-tape.png                 Red cassette + pencil hero
-      auth-tape-shadow.png          Tape ground shadow
+      auth-background.webp          Concrete hero background (right side of auth screen + loading bg)
+      auth-tape.webp                Red cassette + pencil hero
+      auth-tape-shadow.webp         Tape ground shadow
       auth-red-back.svg             Diagonal red gradient panel (auth + intro cover)
       auth-logo.svg                 Kassette wordmark
+      loading_tape_back.webp        Cassette shell backdrop shown behind loading Lottie in AuthIntro
       logo_loading.json             Lottie — looping loader (solid red/cream, no gradient)
       logo_reveal.json              Lottie — one-shot reveal (gradient stops recolored to brand)
     background/
-      background-generic.jpg
-      object-generic-1/2/3.png
-      tape_back_<genre>.jpg          Per-genre tape-selection backgrounds (8)
+      background-generic.webp
+      object-generic-1/2/3.webp
+      tape_back_<genre>.webp         Per-genre tape-selection backgrounds (8; Hip-Hop→hiphop, Electronic→electro)
       genreBackgrounds.ts            genre→photo map + getWipeDirection helper
     sfx/
       SFX-rewinding-start.aac
@@ -186,7 +194,7 @@ Eight cassettes (added Jazz and Pop in Phase 2), matched by keyword against `tra
 | Hip-Hop | #8e44ad | hip-hop, rap, trap, r&b, soul |
 | Electronic | #2980b9 | electronic, techno, house, edm, dance, ambient |
 | Reggae | #27ae60 | reggae, dancehall, ska, dub, afrobeat |
-| Classical | #d4a017 | classical, orchestra, symphony, piano, soundtrack |
+| Classical | #d4a017 | classical, orchestra, symphony, piano, instrumental, score (NOT soundtrack) |
 | Folk | #e67e22 | folk, country, bluegrass, acoustic, singer-songwriter |
 | Jazz | #1a6b8a | jazz, fusion, bebop, swing, bossa nova |
 | Pop | #e91e8c | pop, french pop, synth-pop, indie pop |
@@ -206,10 +214,10 @@ Apple Music API does **not** expose audio features to developers (400 error on t
    - **energyRaw**: linear RMS of the whole clip (loudness/intensity proxy)
    - **moodRaw**: 0–1 blend of **brightness** (mean spectral centroid via a hand-rolled radix-2 FFT) and **musical mode** (major→happier / minor→darker), where mode comes from an FFT **chroma** vector matched against **Krumhansl–Schmuckler** key profiles. Weighting: `0.6·brightness + 0.4·mode`. (Replaced the old zero-crossing-rate proxy.)
    - **bpm**: autocorrelation of a **spectral-flux** onset novelty curve (sum of positive bin-to-bin magnitude changes), each lag's score weighted by a **log-Gaussian tempo prior** (~120 BPM) to resolve half/double-tempo octave errors, clamped to 50–200 (no lossy folding)
-4. Results cached in IndexedDB (`kassette-features`, **v6** — bumped when BPM moved to spectral-flux + tempo prior) via `featureCache.ts`
+4. Results cached in IndexedDB (`kassette-features`, **v6** — bumped when BPM moved to spectral-flux + tempo prior; connection cached as a module-level promise) via `featureCache.ts`
 5. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
 
-The worker is a singleton owned by `analysisClient.ts`, which correlates requests/responses by an incrementing `reqId` (promise map). The concurrency pool (below) parallelizes network + decode + resample on the main thread; the single worker serializes the heavy DSP so the UI never janks.
+A round-robin **worker pool** (up to 4 workers, capped at `hardwareConcurrency - 1`) is owned by `analysisClient.ts`. Responses are correlated by an incrementing `reqId` shared across all workers via a global `pending` map. The concurrency pool (below) parallelizes network + decode + resample on the main thread; the worker pool parallelizes the heavy DSP so the UI never janks. A cross-pass `beginAnalysis`/`endAnalysis` gate in `lib/analysisShared.ts` prevents two passes from double-analyzing the same track simultaneously. Both passes share one long-lived `AudioContext` via `getSharedAudioContext()`.
 
 ### Library-Relative Normalization (`featureNormalize.ts`)
 Raw measurements have no meaningful absolute 0–100 mapping — a fixed constant makes most tracks cluster in a narrow band and the sliders feel dead. Instead `buildNormalizer(featuresMap)` converts each raw value to its **percentile rank within the user's own analyzed library** → `{ pace, energy, mood }` (0 = lowest in library, 100 = highest). This self-calibrates so the sliders always span the full range. The normalizer is cheap (one sort per metric) and rebuilt as analysis fills in more tracks (memoized on `featuresMap` at call sites). With ≤1 analyzed track, all metrics return a neutral 50.
@@ -221,7 +229,7 @@ Both passes use a **bounded concurrency pool** (`lib/mapPool.ts`, `CONCURRENCY =
 Both cancel cleanly on unmount / queue change (a `cancelled` flag passed to `mapPool`'s `shouldStop`).
 
 ### Sorting Logic
-`sortTracksByFilters(tracks, featuresMap, tempo, energy, mood)` in `appleMusic.ts`:
+`sortTracksByFilters(tracks, featuresMap, tempo, energy, mood, normalizer?)` in `appleMusic.ts` (optional 6th `normalizer` param avoids rebuilding it per slider tick):
 - Builds a `buildNormalizer` over `featuresMap` and precomputes each analyzed track's percentile `{ pace, energy, mood }` once (comparator stays O(1) per pair).
 - Each slider (0–100) is a **directional weight**, not a target: slider 0 = want lowest, slider 100 = want highest, slider 50 = neutral (no effect)
 - Only the **upcoming tracks** (after currentTrackIndex) are re-sorted — the current track is never affected
@@ -266,6 +274,69 @@ Apple's preview URLs (`audio-ssl.itunes.apple.com`) support CORS browser fetch. 
 
 ### MusicKit nowPlayingItemDidChange — track index sync
 `music.queue.position` reflects MusicKit's internal queue order, which diverges from `queuedTracks` after a re-sort. Fix: look up `music.nowPlayingItem?.id` in `queuedTracks` by ID to get the correct index. See `onNowPlayingChange` in `CassettePlayer.tsx`.
+
+---
+
+## Post-auth Loading Screen (Phase 3)
+
+### Overview
+After MusicKit authorization, a full-screen `LoadingScreen` overlay (`src/components/LoadingScreen.tsx`) replaces the old bare loading spinner. It sits on top of the player (which mounts underneath as soon as cassettes exist, so the fade-out crossfades seamlessly).
+
+### Flow
+1. **Red phase** (~1s): solid red field; `LoadingTape` (`LoadingTape.tsx`) fades in with endlessly spinning reels and an LCD that cycles through RANDOM real library tracks (streamed live via `fetchLibraryTracks` `onProgress`). Meta uses cached features when available, otherwise random values.
+2. **Concrete phase** (after 1s): crossfades to `auth-background.webp` at 40% opacity under a white bottom→top gradient, with heading "LOADING YOUR LIBRARY / BUILDING YOUR KASSETTES" and an animated drop-shadow on the tape. The tape drifts and rotates slowly.
+3. **Exit**: once library fetch is done AND `useAssetPreloader` reports complete, the overlay fades out (0.45s) revealing the player. `onComplete` unmounts it.
+4. **Loading bar**: `0.5 · libraryProgress + 0.5 · assetProgress` drives the bar on the tape.
+
+### New components
+- **`TrackScreen`** (`src/components/TrackScreen.tsx`) — presentational now/next LCD; shared by `CassettePlayer` (via `TrackDisplay`) and `LoadingTape`. Props: `now`, `nowTime`, `nowDuration`, `nowProgress`, `nowMeta`, `next`, `nextMeta`.
+- **`TrackDisplay`** (`src/components/TrackDisplay.tsx`) — owns the `featuresMap` Zustand subscription + normalizer so `CassettePlayer` no longer re-renders on every analyzed track. Wrapped in `React.memo`.
+- **`useAssetPreloader`** (`src/hooks/useAssetPreloader.ts`) — preloads all player + cassette + scene + auth images in parallel. Failed images count as done; 15s safety timeout forces completion. Does NOT preload the 8 genre backgrounds (those are prefetched lazily by `GenreBackground`).
+
+### App-level wiring (`App.tsx`)
+- `loadingComplete` + `tracksSoFar` state in `App`.
+- `LoadingScreen` rendered as an overlay while `isAuthenticated && !error && !loadingComplete`.
+- The player renders once `cassettes.length > 0` (mounts under the opaque overlay for the crossfade).
+- `featuresMap` subscription lives in `LoadingScreen` / `TrackDisplay`, NOT in `App`.
+- `fetchLibraryTracks` `onProgress` signature is now `(loaded, total, tracksSoFar: Track[])` — partial track list streamed to the LCD.
+
+---
+
+## Performance Optimizations (Tier 1–2, 2026-07)
+
+Key performance work documented in `docs/audits/2026-07-01-perf-filtering-audit.md`:
+
+### DSP worker pool (`analysisClient.ts`)
+Single worker replaced by a round-robin pool (`POOL_SIZE = clamp(1, hardwareConcurrency - 1, 4)`). All workers share one global `pending` map keyed by `reqId`, so responses route correctly regardless of which worker handled the request.
+
+### Cross-pass deduplication (`lib/analysisShared.ts`)
+One shared `AudioContext` (`getSharedAudioContext`) and an in-flight `Set` (`beginAnalysis`/`endAnalysis`) prevent the active-queue and background passes from double-analyzing the same track.
+
+### Background analysis bulk key check (`useBackgroundAnalysis`)
+One `getAllKeys()` call (new `featureCache` export) replaces N serial `getFeatures` round-trips to determine which tracks are uncached.
+
+### `featureCache` connection caching
+`openDB()` caches the IDBDatabase promise at module level (reset to null on open error for retry), avoiding repeated open calls.
+
+### `PlaylistController` imperitive state reads
+`applyAll` reads store state via `usePlayerStore.getState()` (empty dep array — stable callback), builds the normalizer once per call, and passes it as the optional 6th arg to `sortTracksByFilters`.
+
+### `CassettePlayer` granular selectors
+Replaced whole-store destructure with per-field Zustand selectors. LCD extracted to `TrackDisplay`; slider snap effect reads `featuresMap` via `getState()`.
+
+### `CassetteCarousel` memoization
+`CassetteItem` wrapped in `React.memo`. `usePreviewAnalysis` `idKey` memoized.
+
+### `useAssetPreloader` eager preload
+Eagerly preloads all player, cassette, scene, and auth images during the loading screen. `GenreBackground` prefetches the focused + ±1 ring-neighbor backgrounds for instant wipe transitions.
+
+### Vite build (`vite.config.ts`)
+- `build.rollupOptions.output.manualChunks` vendor split: `react`/`framer`/`lottie-react`/`zustand` into separate chunks.
+- `resolve.alias` maps `lottie-web` → `lottie_light.min.js` (tree-shaken build).
+- MusicKit CDN `<script>` in `index.html` has `defer`.
+
+### `buildCassettes` / `matchesGenre`
+Each track's `genreNames` entries are lowercased once before the genre-keyword loop (not per genre).
 
 ---
 
@@ -377,10 +448,10 @@ CSS `animation: ct-spin-cw` was replaced with a `requestAnimationFrame` loop in 
 A full-screen background layer rendered behind all UI, with per-cassette/genre background image and decorative PNG objects positioned around the player.
 
 ### Files
-- `src/assets/background/background-generic.jpg` — generic background (1376×1046)
-- `src/assets/background/object-generic-1.png` — decorative object 1 (880×1204)
-- `src/assets/background/object-generic-2.png` — decorative object 2 (689×989)
-- `src/assets/background/object-generic-3.png` — decorative object 3 (482×1048)
+- `src/assets/background/background-generic.webp` — generic background
+- `src/assets/background/object-generic-1.webp` — decorative object 1
+- `src/assets/background/object-generic-2.webp` — decorative object 2
+- `src/assets/background/object-generic-3.webp` — decorative object 3
 - `src/components/SceneBackground.tsx` — renders the background + 3 objects
 
 ### CSS structure
@@ -407,14 +478,18 @@ Updated to `background: rgba(0,0,0,0.45)` with `backdrop-filter: blur(8px)` so t
 
 ## Cassette Body System
 
-### Flattened PNG approach
-The cassette body (`ct-swapable`) is rendered as a single pre-composited PNG instead of 15 stacked SVG `<img>` elements. This reduces DOM nodes, eliminates per-cassette layer compositing overhead, and fixes the Chrome `url(#id)` gradient resolution bug.
+### Flattened WebP approach
+The cassette body (`ct-swapable`) is rendered as a single pre-composited **WebP** image instead of stacked SVG `<img>` elements. This reduces DOM nodes, eliminates per-cassette layer compositing overhead, and fixes the Chrome `url(#id)` gradient resolution bug. All raster cassette bodies, genre backgrounds, and scene/auth images were converted from PNG/JPG to WebP (~16.6 MB → ~4.4 MB).
 
-To regenerate the flat PNG after a Figma design change:
+The tape layer stack is: **reels** (SVG, behind body) + **body** (WebP, `ct-swapable`) + **sticker** (genre label, on top). The old `.ct-window` overlay layer has been removed — the window cutout is already baked into the flattened body WebP.
+
+`cassette0-body-flat.webp` is a neutral loading-screen cassette (no genre branding); it is used by `LoadingTape` and is not in `genreBodyMap`.
+
+To regenerate the flat WebP after a Figma design change:
 ```bash
 node scripts/flatten-cassette-body.mjs
 ```
-Script reads SVGs from `src/assets/tapes/`, composites them at 2× (1100×684px) using `sips`, and writes `cassette-body-flat.png`.
+Script reads SVGs from `src/assets/tapes/`, composites them at 2× (1100×684px) using `sips`, and writes `cassette-body-flat.webp`.
 
 ### Genre → style mapping
 `src/assets/tapes/cassetteAssets.ts` is the single source of truth for which body PNG each genre uses:
@@ -425,7 +500,7 @@ export const genreBodyMap: Record<string, string> = {
   ...
 }
 ```
-**Only edit this file** to reassign styles. All 8 genres now have a dedicated flattened body PNG (`cassette1`–`cassette8`): Rock→1, Hip-Hop→2, Electronic→3, Reggae→4, **Folk→5**, **Classical→6**, **Jazz→7**, **Pop→8**. (Classical/Folk were swapped; Jazz/Pop moved off shared styles onto `cassette7`/`cassette8`.)
+**Only edit this file** to reassign styles. All 8 genres have a dedicated flattened body WebP (`cassette1`–`cassette8`): Rock→1, Hip-Hop→2, Electronic→3, Reggae→4, **Folk→5**, **Classical→6**, **Jazz→7**, **Pop→8**. `cassette0-body-flat.webp` is the loading-screen cassette (not in this map). (Classical/Folk were swapped; Jazz/Pop moved off shared styles onto `cassette7`/`cassette8`.)
 
 ### Door SFX (`useDoorSFX`)
 Two one-shot sounds wired into the door animation `useEffect` in `CassettePlayer`:
@@ -470,7 +545,7 @@ Montserrat was fully removed during the Afacad switch.
 ---
 
 ## Tape-Selection Backgrounds (Phase 3)
-Spec: `docs/superpowers/specs/2026-06-30-genre-backgrounds-design.md`. Component: `src/components/GenreBackground.tsx`; genre→photo map + `getWipeDirection` in `src/assets/background/genreBackgrounds.ts`; photos `src/assets/background/tape_back_<genre>.jpg` (note `Hip-Hop→hiphop`, `Electronic→electro`).
+Spec: `docs/superpowers/specs/2026-06-30-genre-backgrounds-design.md`. Component: `src/components/GenreBackground.tsx`; genre→photo map + `getWipeDirection` in `src/assets/background/genreBackgrounds.ts`; photos `src/assets/background/tape_back_<genre>.webp` (note `Hip-Hop→hiphop`, `Electronic→electro`). `GenreBackground` prefetches the focused + ±1 ring-neighbor backgrounds for instant wipe transitions.
 
 Replaces the old blur/white carousel overlays. Behaviour:
 - Full-screen per-genre photo (z-index 20, above the player, below the carousel at 30) with a dark scrim for legibility.
@@ -503,13 +578,13 @@ Stacked column centered above the tapes (`.carousel-header`, fades with the caro
 ## Auth Screen (Phase 3 — Figma node 49:2)
 Full-bleed diagonal layout (assets in `src/assets/auth/`, exported via Figma MCP):
 - **Left**: diagonal red gradient panel (`auth-red-back.svg`, `#E20025→#FF2937`) at `.auth-red` width 54%. On top, `.auth-content` (centered in the red at `left:27%`) holds the Kassette wordmark, the big uppercase Afacad headline "ANALOG SOUL FOR A DIGITAL STREAM", body copy (`#2f0004`), and the connect button.
-- **Right**: concrete `auth-background.jpg` (opacity 0.4 + white top gradient) with the `auth-tape.png` cassette-and-pencil hero centered in the right half; the tape **levitates** (5s ease-in-out) and its shadow (`.auth-tape-shadow`, anchored in `.auth-tape-wrap`) shrinks/fades in sync.
+- **Right**: concrete `auth-background.webp` (opacity 0.4 + white top gradient) with the `auth-tape.webp` cassette-and-pencil hero centered in the right half; the tape **levitates** (5s ease-in-out) and its shadow (`.auth-tape-shadow`, anchored in `.auth-tape-wrap`) shrinks/fades in sync.
 - **Connect button** (`.auth-button`): white pill, red text, hover = lighter + `scale(1.06)` + softer shadow. Label is **"CONNECT WITH  MUSIC"** — an inline Apple-logo SVG (`fill: currentColor`) sits between "with" and "Music" since Afacad has no Apple glyph.
 - Sizing is responsive via `clamp()`/`vw`. Auth+reload flow unchanged (see the 403 fix note below).
 
 ### Pre-auth intro loader (`AuthIntro.tsx`, lottie-react)
 Shown over the auth screen on first load and after Sign Out (App `introDone` state):
-1. Full-red diagonal cover (`auth-red-back.svg` sized `116vw × 215vh` — same 54:100 ratio as `.auth-red` so the **diagonal angle matches**, scaled to cover the screen) with `logo_loading` Lottie centered, looping.
+1. Full-red diagonal cover (`auth-red-back.svg` sized `116vw × 215vh` — same 54:100 ratio as `.auth-red` so the **diagonal angle matches**, scaled to cover the screen) with `logo_loading` Lottie centered, looping. A `loading_tape_back.webp` cassette shell fades in behind the Lottie; TV scanlines (`.auth-intro-scanlines`) overlay the loader.
 2. Meanwhile the auth assets preload (`new Image()`), with a 6s safety timeout.
 3. When ready, the loading loop finishes then swaps to `logo_reveal` (played once).
 4. On reveal complete: the Lottie **fades + scales to 2×** (ease-out), then the red cover **slides left** (diagonal wipe) revealing the auth screen; then it unmounts.
@@ -525,6 +600,8 @@ Two independent effects, both authored in this session:
 
 ## Key finding — 403 on library load right after connect
 In the session where the user just authorized, MusicKit's `api` pipeline doesn't attach the Music User Token to `/v1/me/library/*` requests (immediate fetch → 403; re-authorizing in-session doesn't help — only a full page load does). Fix: `AuthScreen.handleConnect` calls `window.location.reload()` right after `authorize()` — the token is already persisted, so the reload restores the session via the known-good path.
+
+`handleConnect` also temporarily wraps `window.open` to CENTER MusicKit's auth popup in the viewport (MusicKit calls `window.open` internally; we inject calculated `left`/`top` into the features string before restoring the original `window.open` in a `finally` block).
 
 ---
 
