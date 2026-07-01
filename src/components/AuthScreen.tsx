@@ -55,7 +55,7 @@ export function AuthScreen() {
         </div>
       </div>
 
-      <VhsOverlay intensity={1} />
+      <VhsOverlay />
     </div>
   )
 }
