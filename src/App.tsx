@@ -187,8 +187,9 @@ export default function App() {
           onComplete={() => setLoadingComplete(true)}
         />
       )}
-      {/* VHS overlay + tuning panel — on top of every screen, click-through */}
-      <VhsOverlay />
+      {/* VHS overlay + tuning panel — on top of every screen, click-through.
+          Animated only on the auth state; static on loading + player screens. */}
+      <VhsOverlay animate={!isAuthenticated} />
       <VhsDebug vals={vhsVals} onChange={setVhs} />
     </>
   )

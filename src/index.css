@@ -187,6 +187,13 @@ input[type='range'] {
   opacity: var(--vhs-glitch-op, 0.7);
   animation: vhs-glitch var(--vhs-glitch-speed, 1.7s) steps(9) infinite;
 }
+/* Static VHS off the auth state — pause the animated layers (flicker on the
+   overlay itself, grain + glitch); scanlines + vignette are already static. */
+.vhs-overlay--static,
+.vhs-overlay--static .vhs-grain,
+.vhs-overlay--static .vhs-glitch {
+  animation-play-state: paused;
+}
 
 /* Fine dark scanlines */
 .vhs-scanlines {
