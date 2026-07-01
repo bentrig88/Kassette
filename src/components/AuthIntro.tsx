@@ -89,6 +89,8 @@ export function AuthIntro({ onDone }: { onDone: () => void }) {
           <Lottie animationData={logoReveal} loop={false} autoplay onComplete={handleRevealComplete} />
         )}
       </div>
+      {/* TV scanlines over the loader (the app-wide VHS overlay sits below this at z-60) */}
+      <div className="auth-intro-scanlines" aria-hidden="true" />
     </div>
   )
 }

@@ -32,7 +32,7 @@ export const GENRE_KEYWORDS: Record<Genre, string[]> = {
   ],
   'Classical': [
     'classical', 'orchestra', 'symphony', 'opera', 'chamber', 'baroque', 'piano',
-    'instrumental', 'soundtrack', 'score',
+    'instrumental', 'score',
   ],
   'Folk': [
     'folk', 'country', 'bluegrass', 'acoustic', 'folk-rock', 'alternative folk',

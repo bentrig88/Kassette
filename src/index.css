@@ -60,6 +60,18 @@ input[type='range'] {
   overflow: hidden;
   pointer-events: none;
 }
+/* TV scanlines over the loader — mirrors .vhs-scanlines (which is hidden here
+   because the loader sits above the app-wide VHS overlay). */
+.auth-intro-scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--vhs-scan-op, 1);
+  background: repeating-linear-gradient(to bottom,
+    rgba(0, 0, 0, 0.32) 0, rgba(0, 0, 0, 0.32) 1px,
+    transparent 1px, transparent var(--vhs-scan-gap, 3px));
+}
 
 /* Red diagonal cover, oversized so its red fills the whole viewport
    (diagonal edge sits off the right); slides left to reveal the auth screen. */
