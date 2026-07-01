@@ -69,12 +69,13 @@ input[type='range'] {
   background: linear-gradient(to bottom, #fff 41%, rgba(255, 255, 255, 0) 75%);
 }
 
-/* Ground shadow under the tape — thin, blurred */
+/* Ground shadow under the tape — thin, blurred; centered in the right half */
 .auth-tape-shadow {
   position: absolute;
   z-index: 1;
-  left: 52%;
+  left: 75%;
   top: 72%;
+  transform: translateX(-50%);
   width: 42%;
   height: 7%;
   object-fit: fill;
@@ -83,13 +84,13 @@ input[type='range'] {
   pointer-events: none;
 }
 
-/* Hero cassette + pencil, straddling the seam */
+/* Hero cassette + pencil — centered in the right half (50–100% → center 75%) */
 .auth-tape {
   position: absolute;
   z-index: 2;
+  left: 75%;
   top: 50%;
-  right: 2%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   width: 44%;
   max-width: 780px;
   height: auto;
