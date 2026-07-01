@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { configureMusicKit, authorize } from '../services/appleMusic'
+import authBg from '../assets/auth/auth-background.jpg'
+import authRedBack from '../assets/auth/auth-red-back.svg'
+import authTape from '../assets/auth/auth-tape.png'
+import authTapeShadow from '../assets/auth/auth-tape-shadow.png'
+import authLogo from '../assets/auth/auth-logo.svg'
 
 export function AuthScreen() {
   const [connecting, setConnecting] = useState(false)
@@ -11,39 +16,38 @@ export function AuthScreen() {
     try {
       await configureMusicKit()
       await authorize()
-      // In the session where the user *just* authorized, MusicKit's api pipeline
-      // does not attach the Music User Token to /v1/me/library/* requests, so an
-      // immediate library fetch 403s (re-authorizing in-session doesn't help —
-      // only a fresh page load does). authorize() has already persisted the
-      // token, so reload to restore the session via the known-good path:
-      // configure() → isAuthorized() → loadLibrary() with the token present.
+      // MusicKit's api pipeline doesn't attach the user token to library
+      // requests in the session where the user just authorized — reload so the
+      // app restores via the known-good path (see the auth-fix note in git log).
       window.location.reload()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Connection failed'
-      setError(msg)
+      setError(err instanceof Error ? err.message : 'Connection failed')
       setConnecting(false)
     }
   }
 
   return (
     <div className="auth-screen">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <div className="cassette-icon">&#9646;&#9646;</div>
-        </div>
-        <h1 className="auth-title">Kassette</h1>
-        <p className="auth-subtitle">Your Apple Music library, on tape.</p>
-        <button
-          className="auth-button"
-          onClick={handleConnect}
-          disabled={connecting}
-        >
-          {connecting ? 'Connecting...' : 'Connect Apple Music'}
+      <div className="auth-bg">
+        <img src={authBg} alt="" />
+      </div>
+      <img src={authTapeShadow} alt="" className="auth-tape-shadow" />
+      <img src={authTape} alt="" className="auth-tape" />
+      <img src={authRedBack} alt="" className="auth-red" />
+
+      <div className="auth-content">
+        <img src={authLogo} alt="Kassette" className="auth-logo" />
+        <h1 className="auth-title">Analog soul for a digital stream</h1>
+        <p className="auth-body">
+          Kassette brings back the lost art of the 90s mixtape, turning your Apple Music
+          library into a tangible collection of tapes by genres. It restores the intentional,
+          hands-on ritual of curating and playing your own music, recapturing that classic
+          feeling of holding your favorite soundtrack in your hands.
+        </p>
+        <button className="auth-button" onClick={handleConnect} disabled={connecting}>
+          {connecting ? 'Connecting…' : 'Continue with Apple'}
         </button>
         {error && <p className="auth-error">{error}</p>}
-        <p className="auth-hint">
-          You'll be redirected to sign in with your Apple ID.
-        </p>
       </div>
     </div>
   )
