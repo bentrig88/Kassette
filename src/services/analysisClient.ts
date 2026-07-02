@@ -2,9 +2,9 @@
  * Main-thread client for the analysis worker pool.
  *
  * Decoding stays on the main thread (native + async), then we resample the clip
- * to mono 11.025 kHz via OfflineAudioContext and transfer the raw PCM to a
- * worker, which runs the heavy DSP. Downsampling cuts the sample count ~4× and
- * is plenty for BPM / energy / brightness / key estimation.
+ * to mono 44.1 kHz via OfflineAudioContext and transfer the raw PCM to a
+ * worker, which runs the heavy DSP (Essentia.js WASM). 44100 Hz is required:
+ * Essentia's RhythmExtractor2013 has no sampleRate parameter and assumes it.
  *
  * A small round-robin pool of workers is used so multiple clips can be DSP'd in
  * parallel. The global `pending` map is keyed by `reqId` (monotonically
@@ -14,7 +14,7 @@
  */
 import type { TrackFeatures } from './featureCache'
 
-const TARGET_RATE = 11025
+const TARGET_RATE = 44100
 
 interface WorkerResponse {
   reqId: number

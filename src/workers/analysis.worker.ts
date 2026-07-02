@@ -14,10 +14,10 @@ interface AnalyzeRequest {
 // `self.postMessage` is typed for Window under the DOM lib; cast to the worker shape.
 const post = (msg: unknown) => (self as unknown as { postMessage: (m: unknown) => void }).postMessage(msg)
 
-self.onmessage = (e: MessageEvent<AnalyzeRequest>) => {
+self.onmessage = async (e: MessageEvent<AnalyzeRequest>) => {
   const { reqId, id, samples, sampleRate } = e.data
   try {
-    const features = analyzePCM(id, samples, sampleRate)
+    const features = await analyzePCM(id, samples, sampleRate)
     post({ reqId, features })
   } catch (err) {
     post({ reqId, error: String(err) })
