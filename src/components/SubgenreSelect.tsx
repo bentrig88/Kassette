@@ -16,6 +16,8 @@ interface SubgenreSelectProps {
 export function SubgenreSelect({ options, selected, onChange, disabled }: SubgenreSelectProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   // Close on outside click while open.
   useEffect(() => {
@@ -25,6 +27,30 @@ export function SubgenreSelect({ options, selected, onChange, disabled }: Subgen
     }
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [open])
+
+  // Keyboard support while open: Escape closes (returning focus to the
+  // trigger), Tab cycles within the menu instead of escaping into the page.
+  useEffect(() => {
+    if (!open) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        buttonRef.current?.focus()
+        return
+      }
+      if (e.key !== 'Tab' || !menuRef.current) return
+      const focusables = menuRef.current.querySelectorAll<HTMLElement>('input[type="checkbox"]')
+      if (focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+      if (!e.shiftKey && active === last) { e.preventDefault(); first.focus() }
+      else if (e.shiftKey && (active === first || !menuRef.current.contains(active))) { e.preventDefault(); last.focus() }
+      else if (!menuRef.current.contains(active)) { e.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
   }, [open])
 
   const label =
@@ -37,6 +63,7 @@ export function SubgenreSelect({ options, selected, onChange, disabled }: Subgen
   return (
     <div className="pf-subgenre-root" ref={rootRef}>
       <button
+        ref={buttonRef}
         type="button"
         className="pf-subgenre"
         disabled={disabled}
@@ -47,7 +74,7 @@ export function SubgenreSelect({ options, selected, onChange, disabled }: Subgen
         {label}
       </button>
       {open && !disabled && (
-        <div className="pf-subgenre-menu" role="listbox" aria-multiselectable="true">
+        <div ref={menuRef} className="pf-subgenre-menu" role="listbox" aria-multiselectable="true">
           <label className="pf-subgenre-opt">
             <input type="checkbox" checked={selected.length === 0} onChange={() => onChange([])} />
             <span>All</span>

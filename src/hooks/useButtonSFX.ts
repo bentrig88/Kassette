@@ -1,10 +1,17 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import sfxReg from '../assets/sfx/SFX-kassette-button-reg-pressed.aac'
 import sfxEject from '../assets/sfx/SFX-kassette-button-eject-pressed.aac'
 
 export function useButtonSFX() {
   const regRef = useRef<HTMLAudioElement | null>(null)
   const ejectRef = useRef<HTMLAudioElement | null>(null)
+
+  // Release the Audio elements on unmount (sign-out/in cycles would otherwise
+  // accumulate orphaned media elements).
+  useEffect(() => () => {
+    regRef.current?.pause(); regRef.current = null
+    ejectRef.current?.pause(); ejectRef.current = null
+  }, [])
 
   function init() {
     if (regRef.current) return

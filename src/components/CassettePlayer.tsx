@@ -10,6 +10,7 @@ import { useButtonSFX } from '../hooks/useButtonSFX'
 import { useDoorSFX } from '../hooks/useDoorSFX'
 import { useMotorSFX } from '../hooks/useMotorSFX'
 import { usePreviewAnalysis } from '../hooks/usePreviewAnalysis'
+import { useKeyboardNav } from '../hooks/useKeyboardNav'
 import type { AudioQuality } from '../types/music'
 import * as A from '../assets/player/playerAssets'
 import logoUrl from '../assets/misc/logo.svg'
@@ -186,6 +187,15 @@ export function CassettePlayer() {
     if (prevIdx >= 0) playQueueFrom(q, prevIdx).catch(() => {})
     else { try { getMusicKitInstance().seekToTime(0) } catch {/* */} }
   }
+
+  // ←/→ skip tracks while a tape is inserted (pre-insert the carousel owns the
+  // arrows). useKeyboardNav ignores keystrokes on focused inputs, so the filter
+  // sliders keep their native arrow-key behavior when focused.
+  useKeyboardNav(
+    () => { playReg(); handlePrevTrack() },
+    () => { playReg(); handleNextTrack() },
+    isInserted,
+  )
 
   // Media Session API — maps Mac keyboard play/pause (and next/prev) to transport controls
   useEffect(() => {

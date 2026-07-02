@@ -33,18 +33,24 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComp
   const [nextMeta, setNextMeta] = useState<ScreenMeta | null>(null)
 
   const { progress: assetProgress, done: assetDone } = useAssetPreloader()
-  const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
+  // Rebuild the normalizer (3 full sorts) only every 50 new analyses, not on
+  // every featuresMap change — it's read solely by the 450ms LCD tick, where
+  // percentile drift of a few tracks is invisible.
+  const analyzedCount = usePlayerStore((s) => s.analyzedCount)
+  const normBucket = Math.floor(analyzedCount / 50)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const normalizer = useMemo(() => buildNormalizer(usePlayerStore.getState().featuresMap), [normBucket])
 
   // Keep the latest pool/features/normalizer in refs so the cycle interval
   // (set up once) always reads fresh values without resetting.
   const poolRef = useRef(tracksPool)
   const featRef = useRef(featuresMap)
   const normRef = useRef(normalizer)
-  // eslint-disable-next-line react-hooks/refs
+   
   poolRef.current = tracksPool
-  // eslint-disable-next-line react-hooks/refs
+   
   featRef.current = featuresMap
-  // eslint-disable-next-line react-hooks/refs
+   
   normRef.current = normalizer
 
   // Phase: red → concrete after the intro beat.
@@ -53,9 +59,11 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComp
     return () => clearTimeout(t)
   }, [])
 
-  // Fast LCD cycling — real meta if cached, else random.
+  // Fast LCD cycling — real meta if cached, else an honest placeholder (null →
+  // the LCD's dim "—"; fabricated random numbers used to contradict what the
+  // player later shows for the same track).
   useEffect(() => {
-    function metaFor(track: Track | undefined): ScreenMeta {
+    function metaFor(track: Track | undefined): ScreenMeta | null {
       if (track) {
         const f = featRef.current.get(track.id)
         if (f && !f.unanalyzable) {
@@ -63,7 +71,7 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComp
           return { bpm: f.bpm, nrg: n.energy, mood: n.mood }
         }
       }
-      return { bpm: randInt(60, 180), nrg: randInt(0, 100), mood: randInt(0, 100) }
+      return null
     }
     function toScreen(t: Track | undefined): ScreenTrack | null {
       return t ? { name: t.name, artistName: t.artistName } : null

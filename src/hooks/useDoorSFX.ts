@@ -1,10 +1,17 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import sfxDoorOpen from '../assets/sfx/SFX-kassette-tape-door-openning.aac'
 import sfxTapeInsert from '../assets/sfx/SFX-kassette-tape-inserting.aac'
 
 export function useDoorSFX() {
   const doorOpenRef = useRef<HTMLAudioElement | null>(null)
   const tapeInsertRef = useRef<HTMLAudioElement | null>(null)
+
+  // Release the Audio elements on unmount (sign-out/in cycles would otherwise
+  // accumulate orphaned media elements).
+  useEffect(() => () => {
+    doorOpenRef.current?.pause(); doorOpenRef.current = null
+    tapeInsertRef.current?.pause(); tapeInsertRef.current = null
+  }, [])
 
   function init() {
     if (doorOpenRef.current) return

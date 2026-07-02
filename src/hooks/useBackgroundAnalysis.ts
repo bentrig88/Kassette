@@ -3,9 +3,15 @@ import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
 import { getFeatures, setFeatures, getAllKeys, makeTombstone } from '../services/featureCache'
+import type { TrackFeatures } from '../services/featureCache'
 import { getSharedAudioContext, beginAnalysis, endAnalysis } from '../lib/analysisShared'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
+
+// How often buffered results are flushed into the store. Per-track store
+// updates each copy the whole featuresMap (and re-render every subscriber) —
+// over a 10k-track run that's 10k Map copies for no visible benefit.
+const FLUSH_MS = 1000
 
 // How many preview clips to fetch + decode + analyze in parallel.
 const CONCURRENCY = 6
@@ -16,7 +22,7 @@ const CONCURRENCY = 6
  * Already-cached tracks are skipped.
  */
 export function useBackgroundAnalysis(tracks: Track[]) {
-  const addFeatures = usePlayerStore((s) => s.addFeatures)
+  const bulkAddFeatures = usePlayerStore((s) => s.bulkAddFeatures)
   const startedRef = useRef(false)
 
   useEffect(() => {
@@ -24,6 +30,19 @@ export function useBackgroundAnalysis(tracks: Track[]) {
     startedRef.current = true
 
     let cancelled = false
+
+    // Buffer results and flush ~1/s (IndexedDB writes stay per-track; only the
+    // store update is coalesced).
+    const buf: TrackFeatures[] = []
+    let flushTimer: ReturnType<typeof setTimeout> | null = null
+    const flush = () => {
+      flushTimer = null
+      if (buf.length > 0) bulkAddFeatures(buf.splice(0))
+    }
+    const queueFeature = (f: TrackFeatures) => {
+      buf.push(f)
+      flushTimer ??= setTimeout(flush, FLUSH_MS)
+    }
 
     async function run() {
       // Let the active-cassette analysis run first
@@ -59,25 +78,31 @@ export function useBackgroundAnalysis(tracks: Track[]) {
           // tombstone so it is excluded from counts and never retried.
           const tomb = makeTombstone(track.id)
           await setFeatures(tomb).catch(() => {})
-          addFeatures(tomb)
+          queueFeature(tomb)
           return
         }
         if (!beginAnalysis(track.id)) return
         try {
           const res = await fetch(url)
           if (!res.ok) return
-          const buf = await audioCtx.decodeAudioData(await res.arrayBuffer())
+          const decoded = await audioCtx.decodeAudioData(await res.arrayBuffer())
           // degara: ~4-5x faster than multifeature — right trade for bulk
           // coverage (the active cassette's pass keeps multifeature accuracy).
-          const features = await analyzeAudioBuffer(track.id, buf, 'degara')
+          const features = await analyzeAudioBuffer(track.id, decoded, 'degara')
           await setFeatures(features)
-          addFeatures(features)
+          queueFeature(features)
         } catch {/* skip on CORS or decode error */}
         finally { endAnalysis(track.id) }
       }, () => cancelled)
+
+      flush() // final partial batch
     }
 
     run()
-    return () => { cancelled = true }
-  }, [tracks, addFeatures])
+    return () => {
+      cancelled = true
+      if (flushTimer) clearTimeout(flushTimer)
+      flush() // don't drop already-analyzed results on unmount
+    }
+  }, [tracks, bulkAddFeatures])
 }

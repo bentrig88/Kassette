@@ -62,6 +62,7 @@ export function LoadingTape({ progress, now, next, nowMeta, nextMeta }: Props) {
             nowDuration={0}
             nowProgress={0}
             nowMeta={nowMeta}
+            nowMetaFallback="—"
             next={next}
             nextMeta={nextMeta}
           />
