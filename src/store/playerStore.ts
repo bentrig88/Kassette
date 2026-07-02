@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Cassette, PlaybackState, AudioQuality, Track } from '../types/music'
 import type { TrackFeatures } from '../services/featureCache'
 
@@ -57,7 +58,7 @@ interface PlayerState {
   bulkAddFeatures: (features: TrackFeatures[]) => void
 }
 
-export const usePlayerStore = create<PlayerState>((set) => ({
+export const usePlayerStore = create<PlayerState>()(persist((set) => ({
   currentCassette: null,
   queuedTracks: [],
   baseQueue: [],
@@ -129,4 +130,15 @@ export const usePlayerStore = create<PlayerState>((set) => ({
       }
       return { featuresMap: next, analyzedCount: count }
     }),
+}), {
+  // Session persistence: only knobs the user set survive a reload — volume +
+  // slider positions. Everything transient (queue, playback, featuresMap —
+  // which is a Map and lives in IndexedDB anyway) stays out.
+  name: 'kassette-player',
+  partialize: (s) => ({
+    volume: s.volume,
+    tempoFilter: s.tempoFilter,
+    energyFilter: s.energyFilter,
+    moodFilter: s.moodFilter,
+  }),
 }))
