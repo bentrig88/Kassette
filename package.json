@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@types/musickit-js": "^1.0.11",
+    "essentia.js": "0.1.3",
     "framer-motion": "^12.35.0",
     "lottie-react": "^2.4.1",
     "react": "^19.2.0",

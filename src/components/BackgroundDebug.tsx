@@ -17,8 +17,8 @@ function readNum(key: string, fallback: number): number {
 
 export function BackgroundDebug() {
   const [open, setOpen] = useState(false)
-  const [blur, setBlur] = useState(() => readNum(BLUR_KEY, 2))
-  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 0.4))
+  const [blur, setBlur] = useState(() => readNum(BLUR_KEY, 0))
+  const [overlay, setOverlay] = useState(() => readNum(OVERLAY_KEY, 0))
 
   useEffect(() => {
     document.documentElement.style.setProperty('--genre-bg-blur', `${blur}px`)

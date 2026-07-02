@@ -15,6 +15,7 @@ The UI consists of three zones stacked vertically:
 - **Framer Motion v12** — carousel drag + cassette insert animation
 - **MusicKit JS v3** — loaded via CDN script tag in `index.html` (NOT via npm)
 - **Web Audio API** — tape quality filter (low-pass) + VU meter simulation
+- **essentia.js 0.1.3** (pinned exact) — WASM MIR library for audio-feature extraction, worker-only
 - **lottie-react** — plays the pre-auth loader Lottie animations
 - Custom type declarations in `src/types/musickit.d.ts` for MusicKit v3 API
 
@@ -31,9 +32,9 @@ src/
     playerStore.ts      Playback state, inserted cassette, queuedTracks, baseQueue (full shuffled queue for subgenre re-filtering), volume, quality, filter sliders
   services/
     appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
-    audioAnalysis.ts    analyzePCM() — raw BPM/energy/mood DSP (FFT, spectral flux + tempo prior, centroid, chroma, KS key); runs in the worker
-    analysisClient.ts   Main-thread DSP worker POOL (round-robin, up to 4 workers): resample (11kHz mono) + RPC → analyzeAudioBuffer()
-    featureCache.ts     IndexedDB cache (kassette-features v6); connection cached module-level; getAllKeys() for bulk existence check
+    audioAnalysis.ts    analyzePCM() — Essentia.js (WASM) feature extraction: RhythmExtractor2013 (BPM+confidence), KeyExtractor (mode), SpectralCentroidTime (brightness), Loudness (energy); runs in the worker
+    analysisClient.ts   Main-thread DSP worker POOL (round-robin, up to 4 workers): resample (44.1kHz mono) + RPC → analyzeAudioBuffer()
+    featureCache.ts     IndexedDB cache (kassette-features v7); connection cached module-level; getAllKeys() for bulk existence check
     featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
   workers/
     analysis.worker.ts  Analysis worker (one instance per pool slot): runs analyzePCM off the main thread
@@ -61,7 +62,7 @@ src/
     TrackDisplay.tsx        Owns featuresMap subscription + normalizer; renders TrackScreen for player
     CassetteCarousel.tsx    Draggable genre cassette carousel (+ "CHOOSE YOUR GENRE" title)
     CassettePlayer.tsx      Main player: VU meter, tape bay, track display, controls
-    PlaylistController.tsx  3 sliders: tempo/energy/mood (Phase 2: Essentia.js)
+    PlaylistController.tsx  3 sliders: tempo/energy/mood (driven by Essentia.js features)
     SceneBackground.tsx     Persistent generic background + decorative objects (playback)
     GenreBackground.tsx     Per-genre tape-selection photo + diagonal wipe + mouse parallax
     VhsOverlay.tsx          App-wide CSS/SVG VHS overlay (grain/scanlines/glitch/vignette/flicker)
@@ -209,12 +210,13 @@ Three sliders (Pace/Tempo, Energy, Mood) dynamically re-sort the upcoming queue 
 ### Audio Feature Extraction
 Apple Music API does **not** expose audio features to developers (400 error on the audio-features endpoint). Instead, features are extracted from **30-second preview clips** attached to each catalog song:
 1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs (300/req) and extracts `attributes.previews[0].url`
-2. The clip is fetched + `decodeAudioData`'d on the main thread, then **resampled to mono 11.025 kHz** (`OfflineAudioContext`) and the raw PCM is **transferred to a Web Worker** (`analysisClient.ts` → `workers/analysis.worker.ts`). Downsampling cuts the sample count ~4× and is plenty for these features.
-3. `analyzePCM(id, samples, sampleRate)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) returns **RAW** measurements (no fixed 0–100 scaling):
-   - **energyRaw**: linear RMS of the whole clip (loudness/intensity proxy)
-   - **moodRaw**: 0–1 blend of **brightness** (mean spectral centroid via a hand-rolled radix-2 FFT) and **musical mode** (major→happier / minor→darker), where mode comes from an FFT **chroma** vector matched against **Krumhansl–Schmuckler** key profiles. Weighting: `0.6·brightness + 0.4·mode`. (Replaced the old zero-crossing-rate proxy.)
-   - **bpm**: autocorrelation of a **spectral-flux** onset novelty curve (sum of positive bin-to-bin magnitude changes), each lag's score weighted by a **log-Gaussian tempo prior** (~120 BPM) to resolve half/double-tempo octave errors, clamped to 50–200 (no lossy folding)
-4. Results cached in IndexedDB (`kassette-features`, **v6** — bumped when BPM moved to spectral-flux + tempo prior; connection cached as a module-level promise) via `featureCache.ts`
+2. The clip is fetched + `decodeAudioData`'d on the main thread, then **resampled to mono 44.1 kHz** (`OfflineAudioContext`) and the raw PCM is **transferred to a Web Worker** (`analysisClient.ts` → `workers/analysis.worker.ts`). 44100 Hz is required: Essentia's `RhythmExtractor2013` has no sampleRate parameter and assumes it.
+3. `async analyzePCM(id, samples, sampleRate)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) extracts features via **Essentia.js 0.1.3** (WASM port of the Essentia MIR library) and returns **RAW** measurements (no fixed 0–100 scaling):
+   - **energyRaw**: Essentia `Loudness` (Steven's-law `energy^0.67` — a perceptual intensity, better than plain RMS)
+   - **moodRaw**: 0–1 blend of **brightness** (`SpectralCentroidTime`, normalized against a 4 kHz ceiling) and **musical mode** (`KeyExtractor` → major/minor × strength; major→happier / minor→darker). Weighting: `0.6·brightness + 0.4·mode` (same as the old hand-rolled DSP, so the Mood slider's meaning is continuous).
+   - **bpm**: `RhythmExtractor2013` (`multifeature` method — most accurate; `'degara'` is the sanctioned faster fallback), clamped to 50–200
+   - **bpmConfidence** (optional field): RhythmExtractor2013 confidence rescaled to 0–1 (raw scale is 0–5.32); persisted but not yet consumed — enables a future "de-weight shaky BPM" enhancement without re-analysis
+4. Results cached in IndexedDB (`kassette-features`, **v7** — bumped for the Essentia.js migration; connection cached as a module-level promise) via `featureCache.ts`
 5. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
 
 A round-robin **worker pool** (up to 4 workers, capped at `hardwareConcurrency - 1`) is owned by `analysisClient.ts`. Responses are correlated by an incrementing `reqId` shared across all workers via a global `pending` map. The concurrency pool (below) parallelizes network + decode + resample on the main thread; the worker pool parallelizes the heavy DSP so the UI never janks. A cross-pass `beginAnalysis`/`endAnalysis` gate in `lib/analysisShared.ts` prevents two passes from double-analyzing the same track simultaneously. Both passes share one long-lived `AudioContext` via `getSharedAudioContext()`.
@@ -252,9 +254,10 @@ If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (
 The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next) track. **BPM is the actual detected tempo**; **NRG and MOD are the library-relative percentiles** (0–100) from the normalizer, not raw values.
 
 ### Known Limitations / Future Work
-- BPM uses spectral-flux onsets + a tempo prior over a 30s preview — solid on clear-beat genres (verified exact on synthetic 80–160 BPM click tracks), still imperfect on rubato/ambient material.
-- Mood is now brightness (spectral centroid) + major/minor mode (chroma + Krumhansl key profiles) — a real musical signal, though still a heuristic proxy for valence (no trained model). Energy is still raw RMS (could add spectral flux / loudness for a better "energy" sense).
-- Best overall future upgrade: Essentia.js in the worker (RhythmExtractor2013 for BPM+confidence, KeyExtractor, loudness) — the worker plumbing is already in place.
+- Mood is brightness + major/minor mode — a real musical signal, though still a heuristic proxy for valence (no trained model).
+- `RhythmExtractor2013` `multifeature` is CPU-heavy (~2s per 30s clip per worker); if full-library analysis feels too slow, switch the method to `'degara'` in `analyzePCM` (everything else identical).
+- **Essentia WASM objects are NOT garbage-collected** — every vector (`arrayToVector` result, and RhythmExtractor2013's `ticks`/`estimates`/`bpmIntervals` outputs) must be `.delete()`d or the WASM heap exhausts over a full-library run. `analyzePCM` does this in try/finally.
+- `bpmConfidence` (0–1) is stored per track but unused — available for a future de-weighting of low-confidence BPM in the sort.
 - The real-time `AnalyserNode` analysis path (`feedFrame`/`computeFeatures`/`useTrackAnalysis`) was dead code and has been **removed** — only the preview-clip worker path runs.
 - Sliders reset to track values on track change, which can conflict with user-set filters if user wants persistent filtering across tracks
 - Phase 3 will redesign the full UI
@@ -262,6 +265,9 @@ The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next)
 ---
 
 ## Key Technical Decisions & Findings (Phase 2 additions)
+
+### essentia.js import pattern (version-specific — 0.1.3)
+The worker imports the ES dist entries directly: `import Essentia from 'essentia.js/dist/essentia.js-core.es.js'` (default export, a class) + `import { EssentiaWASM } from 'essentia.js/dist/essentia-wasm.es.js'` (an Emscripten Module object with the WASM **base64-embedded**, sync-instantiated — no separate `.wasm` asset for Vite to resolve, which is why this build works in the module worker with zero Vite config). The package ships no `types` entry — ambient declarations live in `src/types/essentia.d.ts`. One `Essentia` instance per worker via a lazy `getEssentia()` singleton. dist entry layouts vary across essentia.js versions — that's why the version is pinned exact. The 2.5 MB worker chunk is lazy (first analysis), never in the main entry chunk.
 
 ### MusicKit play() after setQueue
 After calling `setQueue`, call `music.play()` directly — do NOT call `music.stop()` first. `setQueue` already resets internal state; an explicit `stop()` puts MusicKit into an invalid state causing *"play() was called without a previous stop() or pause() call"* on the subsequent `play()`.

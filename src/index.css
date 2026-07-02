@@ -565,8 +565,8 @@ input[type='range'] {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  /* Blur strength is tunable via the BackgroundDebug panel; default 2px */
-  filter: blur(var(--genre-bg-blur, 2px));
+  /* Blur strength is tunable via the BackgroundDebug panel; default 0px */
+  filter: blur(var(--genre-bg-blur, 0px));
 }
 
 
@@ -576,7 +576,7 @@ input[type='range'] {
   position: absolute;
   inset: 0;
   background: #000;
-  opacity: var(--genre-bg-overlay, 0.4);
+  opacity: var(--genre-bg-overlay, 0);
 }
 
 /* ─── Background debug panel (dev tuning tool) ─────────────── */
