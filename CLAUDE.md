@@ -33,10 +33,10 @@ src/
   services/
     appleMusic.ts       MusicKit configure/auth, parallel library fetch, cassette builder, queue loader, sortTracksByFilters (target-based)
     libraryCache.ts     IndexedDB library snapshot (kassette-library) — instant startup + background revalidation
-    audioAnalysis.ts    analyzePCM() — Essentia.js (WASM) feature extraction: RhythmExtractor2013 (BPM+confidence), KeyExtractor (mode), SpectralCentroidTime (brightness), Loudness (energy); runs in the worker
+    audioAnalysis.ts    analyzePCM() — Essentia.js (WASM) extraction of 7 raw components: RhythmExtractor2013, Loudness, OnsetRate, DynamicComplexity, SpectralCentroidTime, KeyExtractor, Danceability; runs in the worker
     analysisClient.ts   Main-thread DSP worker POOL (round-robin, up to 4 workers): resample (44.1kHz mono) + RPC → analyzeAudioBuffer()
-    featureCache.ts     IndexedDB cache (kassette-features v7); connection cached module-level; getAllKeys() for bulk existence check
-    featureNormalize.ts buildNormalizer() — raw features → library-relative percentiles
+    featureCache.ts     IndexedDB cache (kassette-features v8, raw component signals); connection cached module-level; getAllKeys() for bulk existence check
+    featureNormalize.ts buildNormalizer() — per-component library percentiles, composed into pace/energy/mood via exported ENERGY_WEIGHTS/MOOD_WEIGHTS
   workers/
     analysis.worker.ts  Analysis worker (one instance per pool slot): runs analyzePCM off the main thread
   lib/
@@ -212,18 +212,28 @@ Three sliders (Pace/Tempo, Energy, Mood) dynamically re-sort the upcoming queue 
 Apple Music API does **not** expose audio features to developers (400 error on the audio-features endpoint). Instead, features are extracted from **30-second preview clips** attached to each catalog song:
 1. `fetchPreviewUrls(tracks)` — batch-fetches catalog songs (300/req) and extracts `attributes.previews[0].url`
 2. The clip is fetched + `decodeAudioData`'d on the main thread, then **resampled to mono 44.1 kHz** (`OfflineAudioContext`) and the raw PCM is **transferred to a Web Worker** (`analysisClient.ts` → `workers/analysis.worker.ts`). 44100 Hz is required: Essentia's `RhythmExtractor2013` has no sampleRate parameter and assumes it.
-3. `async analyzePCM(id, samples, sampleRate)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) extracts features via **Essentia.js 0.1.3** (WASM port of the Essentia MIR library) and returns **RAW** measurements (no fixed 0–100 scaling):
-   - **energyRaw**: Essentia `Loudness` (Steven's-law `energy^0.67` — a perceptual intensity, better than plain RMS)
-   - **moodRaw**: 0–1 blend of **brightness** (`SpectralCentroidTime`, normalized against a 4 kHz ceiling) and **musical mode** (`KeyExtractor` → major/minor × strength; major→happier / minor→darker). Weighting: `0.6·brightness + 0.4·mode` (same as the old hand-rolled DSP, so the Mood slider's meaning is continuous).
-   - **bpm**: `RhythmExtractor2013` (`multifeature` method — most accurate; `'degara'` is the sanctioned faster fallback), clamped to 50–200
-   - **bpmConfidence** (optional field): RhythmExtractor2013 confidence rescaled to 0–1 (raw scale is 0–5.32); persisted but not yet consumed — enables a future "de-weight shaky BPM" enhancement without re-analysis
-4. Results cached in IndexedDB (`kassette-features`, **v7** — bumped for the Essentia.js migration; connection cached as a module-level promise) via `featureCache.ts`
+3. `async analyzePCM(id, samples, sampleRate, method)` (`audioAnalysis.ts`, runs **in the worker**, off the main thread) extracts **seven RAW component signals** via **Essentia.js 0.1.3** (no fixed 0–100 scaling; slider values are composed from library percentiles in `featureNormalize.ts`):
+   - **bpm**: `RhythmExtractor2013` (`multifeature` on the active tape, `degara` on the background pass), clamped to 50–200
+   - **bpmConfidence** (optional): multifeature confidence rescaled to 0–1 (raw 0–5.32); omitted for degara; shrinks pace toward neutral in the sort
+   - **loudness**: `Loudness` (Steven's-law `energy^0.67`)
+   - **onsetRate**: `OnsetRate` — onsets/sec (rhythmic activity); its `onsets` output is a WASM vector — `.delete()`d
+   - **dynamicComplexity**: `DynamicComplexity` — loudness fluctuation
+   - **centroidHz**: `SpectralCentroidTime` — brightness
+   - **modeScore**: `KeyExtractor` → 0–1 (major → 0.5+0.5·strength, minor → 0.5−0.5·strength)
+   - **danceability**: `Danceability` — groove/pulse strength; its `dfa` output is a WASM vector — `.delete()`d
+   Full-chain cost (spike-measured, 10s clip): 650 ms multifeature / 205 ms degara — the component algorithms are nearly free next to rhythm extraction.
+4. Results cached in IndexedDB (`kassette-features`, **v8** — bumped for component-based features; connection cached as a module-level promise) via `featureCache.ts`
 5. On startup, cached features are loaded via `getAllFeatures()` and bulk-loaded into `playerStore.featuresMap`
 
 A round-robin **worker pool** (up to 4 workers, capped at `hardwareConcurrency - 1`) is owned by `analysisClient.ts`. Responses are correlated by an incrementing `reqId` shared across all workers via a global `pending` map. The concurrency pool (below) parallelizes network + decode + resample on the main thread; the worker pool parallelizes the heavy DSP so the UI never janks. A cross-pass `beginAnalysis`/`endAnalysis` gate in `lib/analysisShared.ts` prevents two passes from double-analyzing the same track simultaneously. Both passes share one long-lived `AudioContext` via `getSharedAudioContext()`.
 
 ### Library-Relative Normalization (`featureNormalize.ts`)
-Raw measurements have no meaningful absolute 0–100 mapping — a fixed constant makes most tracks cluster in a narrow band and the sliders feel dead. Instead `buildNormalizer(featuresMap)` converts each raw value to its **percentile rank within the user's own analyzed library** → `{ pace, energy, mood }` (0 = lowest in library, 100 = highest). This self-calibrates so the sliders always span the full range. The normalizer is cheap (one sort per metric) and rebuilt as analysis fills in more tracks (memoized on `featuresMap` at call sites). With ≤1 analyzed track, all metrics return a neutral 50.
+Raw measurements have no meaningful absolute 0–100 mapping — a fixed constant makes most tracks cluster in a narrow band and the sliders feel dead. Instead `buildNormalizer(featuresMap)` percentile-ranks **each raw component separately** within the user's analyzed library, then composes `{ pace, energy, mood }` as weighted blends **in percentile space** (units never mix):
+- `pace = P(bpm)`
+- `energy = 0.45·P(loudness) + 0.30·P(onsetRate) + 0.25·P(dynamicComplexity)` — "drive/intensity": loud AND busy AND dynamically dense
+- `mood = 0.45·P(centroidHz) + 0.30·P(modeScore) + 0.25·P(danceability)` — brightness + major/minor + groove
+
+Weights are exported constants (`ENERGY_WEIGHTS`, `MOOD_WEIGHTS`) — **re-tuning them (or composing a future 4th slider from stored components) requires NO re-analysis**. The normalizer is cheap (one sort per component) and rebuilt as analysis fills in more tracks (memoized on `featuresMap` at call sites). Tombstoned entries are skipped. With ≤1 analyzed track, all metrics return a neutral 50.
 
 ### Analysis Priority & Background Processing
 Both passes use a **bounded concurrency pool** (`lib/mapPool.ts`, `CONCURRENCY = 6`) — up to 6 clips fetched + decoded + analyzed in parallel. (Previously each pass was a sequential loop with an artificial per-track delay — 100ms active / 1s background — which made full-library coverage take 30+ minutes; the pool removes that.)
