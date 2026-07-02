@@ -260,9 +260,13 @@ export function CassettePlayer() {
   const currentTrack = displayQueue[currentTrackIndex]
   const nextTrack = displayQueue[currentTrackIndex + 1]
 
-  // Snap sliders to current track's features (library-relative) on track change
+  // Snap sliders to current track's features (library-relative) on track change.
+  // Suppressed while stopped: a stopped-state "now" change comes from the user
+  // re-filtering (sliders/subgenres rebuild the queue in PlaylistController) —
+  // snapping would overwrite the very slider values they just set.
   useEffect(() => {
     if (!currentTrack) return
+    if (usePlayerStore.getState().playbackState === 'stopped') return
     const fm = usePlayerStore.getState().featuresMap
     const f = fm.get(currentTrack.id)
     if (!f) return
