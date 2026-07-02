@@ -1,7 +1,6 @@
 import { GENRES, GENRE_KEYWORDS, GENRE_COLORS } from '../types/music'
 import type { Genre, Cassette, Track } from '../types/music'
 import { buildNormalizer } from './featureNormalize'
-import type { NormalizedFeatures } from './featureNormalize'
 import { mapPool } from '../lib/mapPool'
 import { usePlayerStore } from '../store/playerStore'
 
@@ -242,21 +241,29 @@ export function getMusicKitInstance(): MusicKit.MusicKitInstance {
   return MusicKit.getInstance()
 }
 
+export interface TouchedFilters {
+  tempo: boolean
+  energy: boolean
+  mood: boolean
+}
+
 /**
- * Re-orders tracks so the ones whose features best match the filter values
- * come first. Tracks without analysis data go at the end (shuffled).
+ * Sorts tracks so the ones closest to the slider TARGETS come first.
  *
- * Slider values are 0–100. BPM is normalized: 60 BPM → 0, 180 BPM → 100.
- */
-/**
- * Sorts tracks based on how well they match the slider directions.
+ * Each slider (0–100) is a target percentile within the analyzed library, but
+ * it only participates once the user has actually moved it (`touched`) — an
+ * untouched slider expresses no preference. A track's score is the summed
+ * distance |target − track percentile| over the touched dimensions; lower =
+ * earlier in the queue. This makes every slider position meaningful (Pace 70
+ * prefers mid-fast tracks over the very fastest), unlike the old directional-
+ * weight scheme where 55 and 100 produced the same order.
  *
- * Each slider (0–100) is treated as a directional preference, not a target:
- *   - 50 = neutral (no influence on sort order for that dimension)
- *   - < 50 = prefer lower values (e.g. slow tempo → low BPM first)
- *   - > 50 = prefer higher values (e.g. fast tempo → high BPM first)
+ * Pace distances use a percentile shrunk toward 50 when the BPM detection
+ * confidence is low, pushing shaky detections (rubato/ambient) away from
+ * extreme targets. Display (LCD BPM, slider snap) is unaffected.
  *
- * Unanalyzed tracks go to the end in their original (shuffled) order.
+ * With no touched sliders the pool order is preserved verbatim; otherwise
+ * unanalyzed tracks go to the end in their original (shuffled) order.
  */
 export function sortTracksByFilters(
   tracks: Track[],
@@ -264,8 +271,11 @@ export function sortTracksByFilters(
   tempo: number,
   energy: number,
   mood: number,
-  normalizer?: import('../services/featureNormalize').FeatureNormalizer
+  normalizer?: import('../services/featureNormalize').FeatureNormalizer,
+  touched: TouchedFilters = { tempo: true, energy: true, mood: true }
 ): Track[] {
+  if (!touched.tempo && !touched.energy && !touched.mood) return [...tracks]
+
   const analyzed: Track[] = []
   const unanalyzed: Track[] = []
   for (const t of tracks) {
@@ -273,37 +283,23 @@ export function sortTracksByFilters(
     else unanalyzed.push(t)
   }
 
-  // Convert slider 0–100 to a direction weight: -1 (want low) → 0 (neutral) → +1 (want high)
-  const tw = (tempo - 50) / 50   // tempo weight
-  const ew = (energy - 50) / 50
-  const mw = (mood - 50) / 50
-
-  // Normalize each track's raw features to its percentile rank within the library
-  // (precomputed once so the comparator stays O(1) per pair). Pace is shrunk
-  // toward the neutral 50 when the BPM detection confidence is low, so shaky
-  // detections (rubato/ambient) drift to the middle of a Pace-sorted queue
-  // instead of polluting its extremes. Display (LCD BPM, slider snap) is
-  // unaffected — this only weights the sort.
+  // Precompute each analyzed track's target-distance score once (the
+  // comparator stays O(1) per pair).
   const norm = normalizer ?? buildNormalizer(featuresMap)
-  const normCache = new Map<string, NormalizedFeatures>()
+  const score = new Map<string, number>()
   for (const t of analyzed) {
     const f = featuresMap.get(t.id)!
     const n = norm.normalize(f)
     const conf = 0.4 + 0.6 * (f.bpmConfidence ?? 1)
-    normCache.set(t.id, { ...n, pace: 50 + (n.pace - 50) * conf })
+    const effPace = 50 + (n.pace - 50) * conf
+    let d = 0
+    if (touched.tempo) d += Math.abs(tempo - effPace)
+    if (touched.energy) d += Math.abs(energy - n.energy)
+    if (touched.mood) d += Math.abs(mood - n.mood)
+    score.set(t.id, d)
   }
 
-  analyzed.sort((a, b) => {
-    const na = normCache.get(a.id)!
-    const nb = normCache.get(b.id)!
-
-    // Score = weighted sum; higher score → should appear later in queue.
-    // When tw > 0 (want fast): high pace gets low score → sorted first ✓
-    const scoreA = -(tw * na.pace + ew * na.energy + mw * na.mood)
-    const scoreB = -(tw * nb.pace + ew * nb.energy + mw * nb.mood)
-
-    return scoreA - scoreB
-  })
+  analyzed.sort((a, b) => score.get(a.id)! - score.get(b.id)!)
 
   return [...analyzed, ...unanalyzed]
 }

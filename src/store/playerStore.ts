@@ -14,9 +14,17 @@ interface PlayerState {
   currentTime: number
   duration: number
 
-  tempoFilter: number   // 0–100 (slow → fast BPM)
-  energyFilter: number  // 0–100 (low → high energy)
-  moodFilter: number    // 0–100 (sad → happy)
+  tempoFilter: number   // 0–100 target percentile (slow → fast BPM)
+  energyFilter: number  // 0–100 target percentile (low → high energy)
+  moodFilter: number    // 0–100 target percentile (sad → happy)
+
+  // A slider only filters once the USER has moved it ("touched"). The auto-snap
+  // moves slider positions to the playing track's percentiles but clears these
+  // flags — a snapped position is information, not intent. Reset on insert.
+  touchedFilters: { tempo: boolean; energy: boolean; mood: boolean }
+  markFilterTouched: (which: 'tempo' | 'energy' | 'mood') => void
+  /** Set all three slider values WITHOUT marking them touched (auto-snap). */
+  snapFilters: (tempo: number, energy: number, mood: number) => void
 
   // True when queuedTracks was re-sorted while MusicKit was mid-playback (its
   // internal 20-track window then holds the OLD order). Checked at the next
@@ -65,6 +73,11 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   energyFilter: 50,
   moodFilter: 50,
 
+  touchedFilters: { tempo: false, energy: false, mood: false },
+  markFilterTouched: (which) => set((s) => ({ touchedFilters: { ...s.touchedFilters, [which]: true } })),
+  snapFilters: (tempo, energy, mood) =>
+    set({ tempoFilter: tempo, energyFilter: energy, moodFilter: mood, touchedFilters: { tempo: false, energy: false, mood: false } }),
+
   queueDirty: false,
   setQueueDirty: (dirty) => set({ queueDirty: dirty }),
 
@@ -75,7 +88,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setInsertSourceRect: (rect) => set({ insertSourceRect: rect }),
 
   insertCassette: (cassette) =>
-    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [], queueDirty: false }),
+    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [], queueDirty: false, touchedFilters: { tempo: false, energy: false, mood: false } }),
 
   setQueuedTracks: (tracks) => set({ queuedTracks: tracks }),
   setBaseQueue: (tracks) => set({ baseQueue: tracks }),

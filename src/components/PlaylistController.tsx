@@ -43,6 +43,7 @@ export function PlaylistController() {
   const setTempoFilter = usePlayerStore((s) => s.setTempoFilter)
   const setEnergyFilter = usePlayerStore((s) => s.setEnergyFilter)
   const setMoodFilter = usePlayerStore((s) => s.setMoodFilter)
+  const markFilterTouched = usePlayerStore((s) => s.markFilterTouched)
   const featuresMap = usePlayerStore((s) => s.featuresMap)
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
@@ -109,7 +110,7 @@ export function PlaylistController() {
 
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
-      const sortedUpcoming = sortTracksByFilters(candidates, s.featuresMap, tempo, energy, mood, buildNormalizer(s.featuresMap))
+      const sortedUpcoming = sortTracksByFilters(candidates, s.featuresMap, tempo, energy, mood, buildNormalizer(s.featuresMap), s.touchedFilters)
       s.setQueuedTracks([...played, ...sortedUpcoming])
 
       if (rebuild) {
@@ -129,16 +130,19 @@ export function PlaylistController() {
 
   function handleTempo(v: number) {
     setTempoFilter(v)
+    markFilterTouched('tempo')
     applyAll(v, energyFilter, moodFilter, subgenres, shuffledPool)
   }
 
   function handleEnergy(v: number) {
     setEnergyFilter(v)
+    markFilterTouched('energy')
     applyAll(tempoFilter, v, moodFilter, subgenres, shuffledPool)
   }
 
   function handleMood(v: number) {
     setMoodFilter(v)
+    markFilterTouched('mood')
     applyAll(tempoFilter, energyFilter, v, subgenres, shuffledPool)
   }
 
