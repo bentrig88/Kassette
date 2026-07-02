@@ -311,15 +311,19 @@ export function sortTracksByFilters(
  * Loads a window of sorted tracks into MusicKit starting at startIndex,
  * then stops and plays. This keeps MusicKit's queue in sync with our sorted
  * queuedTracks so auto-advance and the next button both follow the right order.
+ *
+ * Returns false when there was nothing to play (empty/stale window) so callers
+ * can unlatch any pending-play UI state.
  */
-export async function playQueueFrom(tracks: Track[], startIndex: number): Promise<void> {
+export async function playQueueFrom(tracks: Track[], startIndex: number): Promise<boolean> {
   const music = getMusicKitInstance()
   const items = tracks
     .slice(startIndex, startIndex + 20)
     .map((t) => rawItemCache.get(t.id))
     .filter((item): item is MusicKit.MediaItem => item !== undefined)
-  if (items.length === 0) return
+  if (items.length === 0) return false
   await music.setQueue({ items })
   // setQueue already resets playback state — calling stop() before play() confuses MusicKit
   await music.play()
+  return true
 }

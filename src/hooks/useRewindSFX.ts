@@ -48,5 +48,17 @@ export function useRewindSFX() {
     end.play()
   }
 
-  return { play, stop }
+  // Immediate hard-stop of the whole chain (no end sound, no callback) — used
+  // when the interaction is abandoned (e.g. eject mid-rewind).
+  function cancel() {
+    if (!startRef.current) return
+    startRef.current.onended = null
+    startRef.current.pause()
+    loopRef.current!.pause()
+    loopRef.current!.currentTime = 0
+    endRef.current!.onended = null
+    endRef.current!.pause()
+  }
+
+  return { play, stop, cancel }
 }

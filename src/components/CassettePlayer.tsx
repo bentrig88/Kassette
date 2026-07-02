@@ -95,7 +95,9 @@ export function CassettePlayer() {
       const nowId = music.nowPlayingItem?.id
       const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
       const idx = nowId ? q.findIndex((t) => t.id === nowId) : -1
-      setCurrentTrackIndex(idx >= 0 ? idx : 0)
+      // Not found (e.g. the playing track was filtered out of a rebuilt queue
+      // mid-play): keep the previous index rather than jumping the LCD to 0.
+      if (idx >= 0) setCurrentTrackIndex(idx)
       setDuration(music.currentPlaybackDuration)
       setCurrentTime(0)
     }
@@ -138,7 +140,9 @@ export function CassettePlayer() {
       const q = queuedTracksRef.current.length > 0
         ? queuedTracksRef.current
         : (currentCassetteRef.current?.tracks ?? [])
-      await playQueueFrom(q, currentTrackIndexRef.current)
+      const started = await playQueueFrom(q, currentTrackIndexRef.current)
+      // Nothing to play (empty/stale window) — don't leave the button latched.
+      if (!started) setPendingPlay(false)
     } catch (e) { setPendingPlay(false); console.error(e) }
   }
 
@@ -216,7 +220,14 @@ export function CassettePlayer() {
   }
   async function handleEject() {
     setPendingPlay(false)
-    fbPressRef.current = null; stopFF()
+    // Hard-cancel any in-flight rewind WITHOUT the usual seek: kill the rAF,
+    // silence the SFX loop, and unmute — otherwise the unmute (which lives in
+    // stopFB's guarded SFX callback) never runs and audio stays muted.
+    if (fbRafRef.current !== null) { cancelAnimationFrame(fbRafRef.current); fbRafRef.current = null }
+    fbPressRef.current = null
+    rewindSFX.cancel()
+    const el = getAudioEl(); if (el) el.muted = false
+    stopFF()
     try { getMusicKitInstance().stop() } catch {/* */}
     ejectCassette()
   }
@@ -258,7 +269,27 @@ export function CassettePlayer() {
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
   usePreviewAnalysis(displayQueue)
   const currentTrack = displayQueue[currentTrackIndex]
-  const nextTrack = displayQueue[currentTrackIndex + 1]
+  let nextTrack = displayQueue[currentTrackIndex + 1]
+  // While MusicKit drives playback its internal 20-track window may hold a
+  // pre-re-sort order (slider re-sorts deliberately don't re-sync it) — show
+  // ITS actual next item so the NEXT line never lies. With no internal next
+  // (window end) the fallback above is what the completed handler will play.
+  if (playbackState !== 'stopped') {
+    try {
+      const mq = getMusicKitInstance().queue
+      const item = mq.items[mq.position + 1]
+      if (item) {
+        nextTrack = displayQueue.find((t) => t.id === item.id) ?? {
+          id: item.id,
+          name: item.attributes.name,
+          artistName: item.attributes.artistName,
+          albumName: item.attributes.albumName,
+          durationInMillis: item.attributes.durationInMillis,
+          genreNames: item.attributes.genreNames ?? [],
+        }
+      }
+    } catch {/* MusicKit not configured yet */}
+  }
 
   // Snap sliders to current track's features (library-relative) on track change.
   // Suppressed while stopped: a stopped-state "now" change comes from the user
@@ -535,6 +566,7 @@ export function CassettePlayer() {
           onMouseLeave={() => { setPressedBtn(null); stopFB() }}
           onTouchStart={() => { setPressedBtn('rewind'); startFB() }}
           onTouchEnd={() => { setPressedBtn(null); stopFB() }}
+          onTouchCancel={() => { setPressedBtn(null); stopFB() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'rewind' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
@@ -588,6 +620,7 @@ export function CassettePlayer() {
           onMouseLeave={() => { setPressedBtn(null); stopFF() }}
           onTouchStart={() => { setPressedBtn('ff'); startFF() }}
           onTouchEnd={() => { setPressedBtn(null); stopFF() }}
+          onTouchCancel={() => { setPressedBtn(null); stopFF() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'ff' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
