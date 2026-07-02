@@ -17,7 +17,6 @@ interface PlayerState {
   tempoFilter: number   // 0–100 (slow → fast BPM)
   energyFilter: number  // 0–100 (low → high energy)
   moodFilter: number    // 0–100 (sad → happy)
-  filtersActive: boolean // true when any slider is off-center
 
   // Audio features keyed by track ID — grows as tracks are analyzed
   featuresMap: Map<string, TrackFeatures>
@@ -43,10 +42,6 @@ interface PlayerState {
   bulkAddFeatures: (features: TrackFeatures[]) => void
 }
 
-function isActive(tempo: number, energy: number, mood: number) {
-  return tempo !== 50 || energy !== 50 || mood !== 50
-}
-
 export const usePlayerStore = create<PlayerState>((set) => ({
   currentCassette: null,
   queuedTracks: [],
@@ -62,7 +57,6 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   tempoFilter: 50,
   energyFilter: 50,
   moodFilter: 50,
-  filtersActive: false,
 
   featuresMap: new Map(),
   analyzedCount: 0,
@@ -86,9 +80,9 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
 
-  setTempoFilter: (value) => set((s) => ({ tempoFilter: value, filtersActive: isActive(value, s.energyFilter, s.moodFilter) })),
-  setEnergyFilter: (value) => set((s) => ({ energyFilter: value, filtersActive: isActive(s.tempoFilter, value, s.moodFilter) })),
-  setMoodFilter: (value) => set((s) => ({ moodFilter: value, filtersActive: isActive(s.tempoFilter, s.energyFilter, value) })),
+  setTempoFilter: (value) => set({ tempoFilter: value }),
+  setEnergyFilter: (value) => set({ energyFilter: value }),
+  setMoodFilter: (value) => set({ moodFilter: value }),
 
   addFeatures: (features) =>
     set((s) => {

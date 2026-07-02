@@ -205,19 +205,23 @@ export function buildCassettes(tracks: Track[]): Cassette[] {
   return cassettes
 }
 
+/** Uniform Fisher-Yates shuffle (returns a new array). */
+export function shuffleTracks(tracks: Track[]): Track[] {
+  const shuffled = [...tracks]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
 /**
  * Sets MusicKit queue to the cassette's tracks and optionally starts playback.
  */
 export async function loadCassetteQueue(cassette: Cassette, startIndex = 0): Promise<Track[]> {
   const music = MusicKit.getInstance()
 
-  // Shuffle (Fisher-Yates — uniform, unlike sort(()=>rand-0.5)) then take 100
-  const shuffled = [...cassette.tracks]
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  const slice = shuffled.slice(0, 100)
+  const slice = shuffleTracks(cassette.tracks).slice(0, 100)
 
   // Use original MediaItems from cache — they carry cloudId set by MusicKit's API
   const items = slice
@@ -274,10 +278,19 @@ export function sortTracksByFilters(
   const mw = (mood - 50) / 50
 
   // Normalize each track's raw features to its percentile rank within the library
-  // (precomputed once so the comparator stays O(1) per pair).
+  // (precomputed once so the comparator stays O(1) per pair). Pace is shrunk
+  // toward the neutral 50 when the BPM detection confidence is low, so shaky
+  // detections (rubato/ambient) drift to the middle of a Pace-sorted queue
+  // instead of polluting its extremes. Display (LCD BPM, slider snap) is
+  // unaffected — this only weights the sort.
   const norm = normalizer ?? buildNormalizer(featuresMap)
   const normCache = new Map<string, NormalizedFeatures>()
-  for (const t of analyzed) normCache.set(t.id, norm.normalize(featuresMap.get(t.id)!))
+  for (const t of analyzed) {
+    const f = featuresMap.get(t.id)!
+    const n = norm.normalize(f)
+    const conf = 0.4 + 0.6 * (f.bpmConfidence ?? 1)
+    normCache.set(t.id, { ...n, pace: 50 + (n.pace - 50) * conf })
+  }
 
   analyzed.sort((a, b) => {
     const na = normCache.get(a.id)!
