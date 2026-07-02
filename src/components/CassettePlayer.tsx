@@ -36,6 +36,7 @@ export function CassettePlayer() {
   const queuedTracks         = usePlayerStore((s) => s.queuedTracks)
   const isInserted           = usePlayerStore((s) => s.isInserted)
   const playbackState        = usePlayerStore((s) => s.playbackState)
+  const queueDirty           = usePlayerStore((s) => s.queueDirty)
   const volume               = usePlayerStore((s) => s.volume)
   const quality              = usePlayerStore((s) => s.quality)
   const currentTrackIndex    = usePlayerStore((s) => s.currentTrackIndex)
@@ -94,8 +95,31 @@ export function CassettePlayer() {
     const onNowPlayingChange = () => {
       const nowId = music.nowPlayingItem?.id
       const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
+
+      // Boundary re-sync: the queue was re-sorted mid-playback, so MusicKit
+      // just auto-advanced along its STALE window. If it started a different
+      // track than our sorted queue intends, re-issue the window from the
+      // fresh queue (the stale track plays only for a beat — the least
+      // disruptive point to correct, vs. interrupting mid-track).
+      // playQueueFrom clears the flag, so manual next/prev/play (which already
+      // re-issue the window) never trip this path.
+      const store = usePlayerStore.getState()
+      if (store.queueDirty) {
+        store.setQueueDirty(false)
+        const intendedIdx = currentTrackIndexRef.current + 1
+        const intended = q[intendedIdx]
+        if (intended && nowId && intended.id !== nowId) {
+          setCurrentTrackIndex(intendedIdx)
+          setCurrentTime(0)
+          playQueueFrom(q, intendedIdx).catch(() => {})
+          return
+        }
+      }
+
       const idx = nowId ? q.findIndex((t) => t.id === nowId) : -1
-      setCurrentTrackIndex(idx >= 0 ? idx : 0)
+      // Not found (e.g. the playing track was filtered out of a rebuilt queue
+      // mid-play): keep the previous index rather than jumping the LCD to 0.
+      if (idx >= 0) setCurrentTrackIndex(idx)
       setDuration(music.currentPlaybackDuration)
       setCurrentTime(0)
     }
@@ -138,7 +162,9 @@ export function CassettePlayer() {
       const q = queuedTracksRef.current.length > 0
         ? queuedTracksRef.current
         : (currentCassetteRef.current?.tracks ?? [])
-      await playQueueFrom(q, currentTrackIndexRef.current)
+      const started = await playQueueFrom(q, currentTrackIndexRef.current)
+      // Nothing to play (empty/stale window) — don't leave the button latched.
+      if (!started) setPendingPlay(false)
     } catch (e) { setPendingPlay(false); console.error(e) }
   }
 
@@ -216,7 +242,14 @@ export function CassettePlayer() {
   }
   async function handleEject() {
     setPendingPlay(false)
-    fbPressRef.current = null; stopFF()
+    // Hard-cancel any in-flight rewind WITHOUT the usual seek: kill the rAF,
+    // silence the SFX loop, and unmute — otherwise the unmute (which lives in
+    // stopFB's guarded SFX callback) never runs and audio stays muted.
+    if (fbRafRef.current !== null) { cancelAnimationFrame(fbRafRef.current); fbRafRef.current = null }
+    fbPressRef.current = null
+    rewindSFX.cancel()
+    const el = getAudioEl(); if (el) el.muted = false
+    stopFF()
     try { getMusicKitInstance().stop() } catch {/* */}
     ejectCassette()
   }
@@ -258,7 +291,29 @@ export function CassettePlayer() {
   const displayQueue = queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])
   usePreviewAnalysis(displayQueue)
   const currentTrack = displayQueue[currentTrackIndex]
-  const nextTrack = displayQueue[currentTrackIndex + 1]
+  let nextTrack = displayQueue[currentTrackIndex + 1]
+  // While MusicKit drives playback its internal 20-track window may hold a
+  // pre-re-sort order — show ITS actual next item so the NEXT line never lies.
+  // Exception: queueDirty means a mid-play re-sort is pending and the next
+  // track boundary will re-issue the window from OUR queue, so the sorted
+  // queue's next (the fallback above) is what will actually play. With no
+  // internal next (window end) the fallback is likewise what plays next.
+  if (playbackState !== 'stopped' && !queueDirty) {
+    try {
+      const mq = getMusicKitInstance().queue
+      const item = mq.items[mq.position + 1]
+      if (item) {
+        nextTrack = displayQueue.find((t) => t.id === item.id) ?? {
+          id: item.id,
+          name: item.attributes.name,
+          artistName: item.attributes.artistName,
+          albumName: item.attributes.albumName,
+          durationInMillis: item.attributes.durationInMillis,
+          genreNames: item.attributes.genreNames ?? [],
+        }
+      }
+    } catch {/* MusicKit not configured yet */}
+  }
 
   // Snap sliders to current track's features (library-relative) on track change.
   // Suppressed while stopped: a stopped-state "now" change comes from the user
@@ -535,6 +590,7 @@ export function CassettePlayer() {
           onMouseLeave={() => { setPressedBtn(null); stopFB() }}
           onTouchStart={() => { setPressedBtn('rewind'); startFB() }}
           onTouchEnd={() => { setPressedBtn(null); stopFB() }}
+          onTouchCancel={() => { setPressedBtn(null); stopFB() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'rewind' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>
@@ -588,6 +644,7 @@ export function CassettePlayer() {
           onMouseLeave={() => { setPressedBtn(null); stopFF() }}
           onTouchStart={() => { setPressedBtn('ff'); startFF() }}
           onTouchEnd={() => { setPressedBtn(null); stopFF() }}
+          onTouchCancel={() => { setPressedBtn(null); stopFF() }}
         >
           <div className={`np-btn-slot np-btn-slot--sm${pressedBtn === 'ff' ? ' np-btn-slot--pressed' : ''}`}>
             <div className="np-btn-offset"><img src={A.imgButtonOffset} alt="" /></div>

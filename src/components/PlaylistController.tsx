@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import { usePlayerStore } from '../store/playerStore'
-import { sortTracksByFilters } from '../services/appleMusic'
+import { sortTracksByFilters, shuffleTracks } from '../services/appleMusic'
 import { buildNormalizer } from '../services/featureNormalize'
 import { SubgenreSelect } from './SubgenreSelect'
+import type { Track } from '../types/music'
 
 interface SliderProps {
   label: string
@@ -59,12 +60,20 @@ export function PlaylistController() {
     return [...set].sort((a, b) => a.localeCompare(b))
   }, [currentCassette])
 
+  // Full-cassette pool, shuffled once per insert. cassette.tracks is in library
+  // order; without this, a subgenre selection with neutral sliders would come
+  // out in album/alphabetical clumps (the zero-weight sort is stable) instead
+  // of feeling like a mixtape. Shuffled once (not per drag) so the order is
+  // stable across slider moves within one insert.
+  const [shuffledPool, setShuffledPool] = useState<Track[]>(() => shuffleTracks(currentCassette?.tracks ?? []))
+
   // Reset to All whenever a new cassette is inserted (adjust-state-on-change
   // pattern — runs during render, no effect).
   const [seenCassetteId, setSeenCassetteId] = useState(currentCassette?.id)
   if (currentCassette?.id !== seenCassetteId) {
     setSeenCassetteId(currentCassette?.id)
     setSubgenres([])
+    setShuffledPool(shuffleTracks(currentCassette?.tracks ?? []))
   }
 
   // Rebuild the upcoming queue from the full base queue (minus already-played),
@@ -75,7 +84,7 @@ export function PlaylistController() {
   // (empty dep array) — applyAll is only ever called from event handlers, never
   // during render, so getState() always returns the latest committed state.
   const applyAll = useCallback(
-    (tempo: number, energy: number, mood: number, subs: string[]) => {
+    (tempo: number, energy: number, mood: number, subs: string[], subgenrePool: Track[]) => {
       const s = usePlayerStore.getState()
       if (!s.isInserted) return
 
@@ -89,11 +98,12 @@ export function PlaylistController() {
       const played = rebuild ? [] : s.queuedTracks.slice(0, s.currentTrackIndex + 1)
       const playedIds = new Set(played.map((t) => t.id))
 
-      // Subgenre filter searches the FULL cassette (so niche subgenres beyond the
-      // shuffled 100-track queue still surface their tracks). "All" uses the fresh
-      // 100-track baseQueue to preserve the per-insert shuffle.
+      // Subgenre filter searches the FULL cassette via the per-insert shuffled
+      // pool (so niche subgenres beyond the shuffled 100-track queue still
+      // surface their tracks, in mixtape order). "All" uses the fresh 100-track
+      // baseQueue to preserve the per-insert shuffle.
       const pool = subs.length > 0
-        ? (s.currentCassette?.tracks ?? [])
+        ? (subgenrePool.length > 0 ? subgenrePool : (s.currentCassette?.tracks ?? []))
         : (s.baseQueue.length > 0 ? s.baseQueue : (s.currentCassette?.tracks ?? []))
       if (pool.length === 0) return
 
@@ -107,6 +117,11 @@ export function PlaylistController() {
         // via playQueueFrom (see CassettePlayer.handlePlay), which is the proven
         // setQueue-then-play path.
         s.setCurrentTrackIndex(0)
+      } else {
+        // Re-sorted while MusicKit is mid-playback: its internal window still
+        // holds the old order. Flag it; the next track boundary re-issues the
+        // window from the fresh queue (see onNowPlayingChange in CassettePlayer).
+        s.setQueueDirty(true)
       }
     },
     [],
@@ -114,22 +129,22 @@ export function PlaylistController() {
 
   function handleTempo(v: number) {
     setTempoFilter(v)
-    applyAll(v, energyFilter, moodFilter, subgenres)
+    applyAll(v, energyFilter, moodFilter, subgenres, shuffledPool)
   }
 
   function handleEnergy(v: number) {
     setEnergyFilter(v)
-    applyAll(tempoFilter, v, moodFilter, subgenres)
+    applyAll(tempoFilter, v, moodFilter, subgenres, shuffledPool)
   }
 
   function handleMood(v: number) {
     setMoodFilter(v)
-    applyAll(tempoFilter, energyFilter, v, subgenres)
+    applyAll(tempoFilter, energyFilter, v, subgenres, shuffledPool)
   }
 
   function handleSubgenres(next: string[]) {
     setSubgenres(next)
-    applyAll(tempoFilter, energyFilter, moodFilter, next)
+    applyAll(tempoFilter, energyFilter, moodFilter, next, shuffledPool)
   }
 
   const upcoming = useMemo(

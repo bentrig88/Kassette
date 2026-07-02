@@ -92,7 +92,9 @@ export function TrackScreen({ now, nowTime, nowDuration, nowProgress, nowMeta, n
               <span>MOOD {nowMeta.mood}</span>
             </div>
           ) : (
-            <div className="np-screen-meta np-screen-meta--empty">NO DATA</div>
+            // A real track without meta is still being analyzed — say so
+            // instead of the broken-feeling "NO DATA".
+            <div className="np-screen-meta np-screen-meta--empty">{now ? 'ANALYZING…' : 'NO DATA'}</div>
           )}
         </div>
       </div>
