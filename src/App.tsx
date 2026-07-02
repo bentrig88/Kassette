@@ -8,7 +8,10 @@ import {
   fetchLibraryTracks,
   buildCassettes,
   getMusicKitInstance,
+  getRawItemEntries,
+  restoreRawItems,
 } from './services/appleMusic'
+import { loadLibrarySnapshot, saveLibrarySnapshot, clearLibrarySnapshot } from './services/libraryCache'
 import { getAllFeatures } from './services/featureCache'
 import { useBackgroundAnalysis } from './hooks/useBackgroundAnalysis'
 import { AuthScreen } from './components/AuthScreen'
@@ -83,10 +86,40 @@ export default function App() {
   useEffect(() => {
     if (!isAuthenticated) return
 
+    // Compare by ordered ids — Apple returns a stable library order, so any
+    // add/remove/reorder shows up as a mismatch.
+    function sameLibrary(a: Track[], b: Track[]): boolean {
+      return a.length === b.length && a.every((t, i) => t.id === b[i].id)
+    }
+
     async function loadLibrary() {
       setLoading(true)
       setLoadingProgress(0)
       setError(null)
+
+      // Cache-first: render cassettes instantly from the IndexedDB snapshot,
+      // then revalidate against the API in the background. The snapshot also
+      // restores the raw MediaItems (cloudId) so playback works from cache.
+      const cached = await loadLibrarySnapshot()
+      if (cached && cached.tracks.length > 0) {
+        restoreRawItems(cached.rawItems)
+        setCassettes(buildCassettes(cached.tracks))
+        setAllTracks(cached.tracks)
+        setTracksSoFar(cached.tracks)
+        setLoadingProgress(100)
+        setLoading(false)
+
+        fetchLibraryTracks()
+          .then((fresh) => {
+            saveLibrarySnapshot(fresh, getRawItemEntries())
+            if (!sameLibrary(fresh, cached.tracks)) {
+              setCassettes(buildCassettes(fresh))
+              setAllTracks(fresh)
+            }
+          })
+          .catch(() => {/* revalidation is best-effort; cache already rendered */})
+        return
+      }
 
       try {
         const tracks = await fetchLibraryTracks((loaded, est, soFar) => {
@@ -97,6 +130,7 @@ export default function App() {
         setCassettes(cassettes)
         setAllTracks(tracks)
         setLoadingProgress(100)
+        saveLibrarySnapshot(tracks, getRawItemEntries())
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load library'
         setError(msg)
@@ -113,6 +147,7 @@ export default function App() {
       getMusicKitInstance().stop()
       await getMusicKitInstance().unauthorize()
     } catch {/* */}
+    clearLibrarySnapshot() // don't flash this library to the next account
     setAuthenticated(false)
     setCassettes([])
     setIntroDone(false) // replay the intro loader next time auth is shown

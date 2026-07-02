@@ -13,6 +13,16 @@ let configured = false
 // response — we must reuse them for setQueue rather than constructing new ones.
 const rawItemCache = new Map<string, MusicKit.MediaItem>()
 
+/** Snapshot of the raw MediaItem cache (for the library IndexedDB snapshot). */
+export function getRawItemEntries(): [string, MusicKit.MediaItem][] {
+  return [...rawItemCache.entries()]
+}
+
+/** Restore raw MediaItems from a library snapshot (they carry setQueue's cloudId). */
+export function restoreRawItems(entries: [string, MusicKit.MediaItem][]): void {
+  for (const [id, item] of entries) rawItemCache.set(id, item)
+}
+
 export async function configureMusicKit(): Promise<void> {
   if (configured) return
   if (!DEVELOPER_TOKEN) {
