@@ -1,22 +1,25 @@
 /**
- * Library-relative feature normalization.
+ * Library-relative feature normalization + slider composition.
  *
- * analyzeBuffer() stores RAW measurements (actual BPM, linear RMS, zero-crossing
- * rate) — values whose absolute magnitude is hard to map to a meaningful 0–100
- * scale with a fixed constant (most tracks cluster in a narrow band, so a global
- * constant makes the sliders feel unresponsive).
+ * The cache stores RAW per-track components (see featureCache.TrackFeatures).
+ * Each component is normalized to its PERCENTILE RANK within the user's own
+ * analyzed library (0 = lowest, 100 = highest), then the three slider values
+ * are composed as weighted blends of percentiles:
  *
- * Instead we normalize each raw value to its PERCENTILE RANK within the user's
- * own analyzed library: 0 = lowest in the library, 100 = highest. This
- * self-calibrates to the music the user actually has, so the Pace/Energy/Mood
- * sliders always span the full range and discriminate well.
+ *   pace   = P(bpm)
+ *   energy = 0.45·P(loudness) + 0.30·P(onsetRate) + 0.25·P(dynamicComplexity)
+ *   mood   = 0.45·P(centroidHz) + 0.30·P(modeScore) + 0.25·P(danceability)
+ *
+ * Blending percentiles (not raw values) keeps units comparable, and because
+ * the blend happens here — not in the analysis worker — the weights can be
+ * re-tuned without re-analyzing the library.
  */
 import type { TrackFeatures } from './featureCache'
 
 export interface NormalizedFeatures {
   pace: number   // 0–100 percentile of BPM across the library
-  energy: number // 0–100 percentile of raw energy (RMS)
-  mood: number   // 0–100 percentile of raw mood (ZCR brightness proxy)
+  energy: number // 0–100 drive/intensity blend (loudness + activity + dynamics)
+  mood: number   // 0–100 sad→happy blend (brightness + mode + groove)
 }
 
 export interface FeatureNormalizer {
@@ -24,6 +27,12 @@ export interface FeatureNormalizer {
   count: number
   normalize: (f: TrackFeatures) => NormalizedFeatures
 }
+
+export const ENERGY_WEIGHTS = { loudness: 0.45, onsetRate: 0.3, dynamicComplexity: 0.25 } as const
+export const MOOD_WEIGHTS = { centroidHz: 0.45, modeScore: 0.3, danceability: 0.25 } as const
+
+const COMPONENTS = ['bpm', 'loudness', 'onsetRate', 'dynamicComplexity', 'centroidHz', 'modeScore', 'danceability'] as const
+type Component = (typeof COMPONENTS)[number]
 
 /** Percentile rank of `v` in an ascending-sorted array: (count ≤ v) / n × 100. */
 function percentile(sorted: number[], v: number): number {
@@ -41,28 +50,35 @@ function percentile(sorted: number[], v: number): number {
 
 /**
  * Build a normalizer from the current set of analyzed features. Cheap to
- * rebuild (one sort per metric); memoize on `featuresMap` at the call site.
+ * rebuild (one sort per component); memoize on `featuresMap` at the call site.
  */
 export function buildNormalizer(featuresMap: Map<string, TrackFeatures>): FeatureNormalizer {
-  const bpms: number[] = []
-  const energies: number[] = []
-  const moods: number[] = []
+  const sorted: Record<Component, number[]> = {
+    bpm: [], loudness: [], onsetRate: [], dynamicComplexity: [],
+    centroidHz: [], modeScore: [], danceability: [],
+  }
   for (const f of featuresMap.values()) {
     if (f.unanalyzable) continue // tombstones carry zeroed sentinels, not data
-    bpms.push(f.bpm)
-    energies.push(f.energyRaw)
-    moods.push(f.moodRaw)
+    for (const c of COMPONENTS) sorted[c].push(f[c])
   }
-  bpms.sort((a, b) => a - b)
-  energies.sort((a, b) => a - b)
-  moods.sort((a, b) => a - b)
+  for (const c of COMPONENTS) sorted[c].sort((a, b) => a - b)
+
+  const P = (c: Component, f: TrackFeatures) => percentile(sorted[c], f[c])
 
   return {
-    count: bpms.length,
+    count: sorted.bpm.length,
     normalize: (f: TrackFeatures): NormalizedFeatures => ({
-      pace: percentile(bpms, f.bpm),
-      energy: percentile(energies, f.energyRaw),
-      mood: percentile(moods, f.moodRaw),
+      pace: P('bpm', f),
+      energy: Math.round(
+        ENERGY_WEIGHTS.loudness * P('loudness', f) +
+        ENERGY_WEIGHTS.onsetRate * P('onsetRate', f) +
+        ENERGY_WEIGHTS.dynamicComplexity * P('dynamicComplexity', f),
+      ),
+      mood: Math.round(
+        MOOD_WEIGHTS.centroidHz * P('centroidHz', f) +
+        MOOD_WEIGHTS.modeScore * P('modeScore', f) +
+        MOOD_WEIGHTS.danceability * P('danceability', f),
+      ),
     }),
   }
 }
