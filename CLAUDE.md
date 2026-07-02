@@ -29,9 +29,10 @@ src/
     music.ts            App types: Genre, Cassette, Track, PlaybackState, AudioQuality
   store/
     musicStore.ts       Auth state, cassettes array, selected carousel index, loading
-    playerStore.ts      Playback state, inserted cassette, queuedTracks, baseQueue (full shuffled queue for subgenre re-filtering), volume, quality, filter sliders
+    playerStore.ts      Playback state, inserted cassette, queuedTracks, baseQueue, queueDirty, volume, quality, filter sliders + touchedFilters (persisted: volume + sliders)
   services/
-    appleMusic.ts       MusicKit configure/auth, library fetch, cassette builder, queue loader, sortTracksByFilters
+    appleMusic.ts       MusicKit configure/auth, parallel library fetch, cassette builder, queue loader, sortTracksByFilters (target-based)
+    libraryCache.ts     IndexedDB library snapshot (kassette-library) — instant startup + background revalidation
     audioAnalysis.ts    analyzePCM() — Essentia.js (WASM) feature extraction: RhythmExtractor2013 (BPM+confidence), KeyExtractor (mode), SpectralCentroidTime (brightness), Loudness (energy); runs in the worker
     analysisClient.ts   Main-thread DSP worker POOL (round-robin, up to 4 workers): resample (44.1kHz mono) + RPC → analyzeAudioBuffer()
     featureCache.ts     IndexedDB cache (kassette-features v7); connection cached module-level; getAllKeys() for bulk existence check
@@ -231,12 +232,13 @@ Both passes use a **bounded concurrency pool** (`lib/mapPool.ts`, `CONCURRENCY =
 Both cancel cleanly on unmount / queue change (a `cancelled` flag passed to `mapPool`'s `shouldStop`).
 
 ### Sorting Logic
-`sortTracksByFilters(tracks, featuresMap, tempo, energy, mood, normalizer?)` in `appleMusic.ts` (optional 6th `normalizer` param avoids rebuilding it per slider tick):
-- Builds a `buildNormalizer` over `featuresMap` and precomputes each analyzed track's percentile `{ pace, energy, mood }` once (comparator stays O(1) per pair).
-- Each slider (0–100) is a **directional weight**, not a target: slider 0 = want lowest, slider 100 = want highest, slider 50 = neutral (no effect)
+`sortTracksByFilters(tracks, featuresMap, tempo, energy, mood, normalizer?, touched?)` in `appleMusic.ts` (optional `normalizer` param avoids rebuilding it per slider tick):
+- Builds a `buildNormalizer` over `featuresMap` and precomputes each analyzed track's target-distance score once (comparator stays O(1) per pair).
+- Each slider (0–100) is a **target percentile**, and only participates once the USER has moved it (`touchedFilters` in playerStore). Score = Σ over touched dims of `|target − trackPercentile|`, lower = earlier. Untouched sliders express no preference; all-untouched preserves pool order verbatim.
+- **Pace** uses a confidence-shrunk percentile (`50 + (pace−50)·(0.4 + 0.6·bpmConfidence)`) so shaky BPM detections drift toward the middle instead of polluting extreme targets. Display (LCD BPM, snap) is unaffected.
 - Only the **upcoming tracks** (after currentTrackIndex) are re-sorted — the current track is never affected
-- Unanalyzed tracks go to the end, preserving their shuffled order
-- The sort runs when any slider is changed; `currentTrackIndex` is NOT updated (stays pointing at current track)
+- Unanalyzed tracks (and unanalyzable tombstones) go to the end, preserving their shuffled order
+- The sort runs when any slider is changed; `currentTrackIndex` is NOT updated (stays pointing at current track). The subgenre pool is a per-insert Fisher-Yates-shuffled copy of the full cassette (`shuffledPool` in PlaylistController) so neutral sorts stay mixtape-ordered.
 
 ### Queue Management
 `playQueueFrom(tracks, startIndex)` in `appleMusic.ts`:
@@ -245,10 +247,19 @@ Both cancel cleanly on unmount / queue change (a `cancelled` flag passed to `map
 - Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order.
 
 ### Slider Auto-Snap
-When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag). **Suppressed while `playbackState === 'stopped'`**: a stopped-state "now" change is caused by the user re-filtering (sliders/subgenres rebuild the queue), and snapping would overwrite the slider values they just set.
+When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position via `snapFilters`, which also **clears the `touchedFilters` flags** — a snapped position is information about the playing track, not a user-set target, so it never acts as a filter until the user moves a slider again. This does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play, and skips tombstoned tracks. **Suppressed while `playbackState === 'stopped'`**: a stopped-state "now" change is caused by the user re-filtering (sliders/subgenres rebuild the queue), and snapping would overwrite the slider values they just set.
 
 ### Sliders Disabled State
-If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (`pointer-events: none`) with the message "Analyzing your tape… N/20 tracks ready". They unlock automatically as analysis progresses.
+If fewer than 5 analyzABLE upcoming tracks have analysis data (or fewer than 5 REAL analyses exist library-wide — `analyzedCount` excludes tombstones), the sliders are grayed out (`pointer-events: none`) with the message "Analyzing your tape… N/M tracks ready". Unanalyzable tombstones are excluded from both N and M. A tape whose upcoming tracks are ALL tombstoned shows "No previews available for this tape" and stays disabled. They unlock automatically as analysis progresses.
+
+### Unanalyzable tombstones
+Tracks with no `catalogId` / no preview URL get a cached tombstone (`TrackFeatures.unanalyzable: true`, zeroed sentinel fields — `makeTombstone` in `featureCache.ts`). Tombstones are excluded from: analysis retries, `buildNormalizer` distributions, sort scoring (treated as unanalyzed), `analyzedCount`, and the slider-unlock denominators. The LCD shows **NO PREVIEW** for them (vs **ANALYZING…** for pending tracks). Transient fetch/decode errors do NOT tombstone (they stay retryable).
+
+### Two-tier analysis speed
+The active-cassette pass uses RhythmExtractor2013 `multifeature` (most accurate, ~2s/clip, yields `bpmConfidence`); the background library pass uses `degara` (~4-5× faster, no confidence — the field is omitted, and absent means "treat as confident" in the sort). Method is threaded `analyzeAudioBuffer(id, buffer, method)` → worker message → `analyzePCM`.
+
+### Session persistence
+`playerStore` uses zustand `persist` (localStorage key `kassette-player`), partialized to `volume` + the three slider values only. The library itself is snapshotted in IndexedDB (`kassette-library`, `libraryCache.ts`): startup renders cassettes instantly from the snapshot (raw MediaItems included — they carry setQueue's `cloudId`), then refetches in the background and swaps in the fresh library only if the ordered track ids changed. Sign-out clears the snapshot.
 
 ### Track Display
 The CassettePlayer LCD screen shows `BPM / NRG / MOD` for the current (and next) track. **BPM is the actual detected tempo**; **NRG and MOD are the library-relative percentiles** (0–100) from the normalizer, not raw values.
