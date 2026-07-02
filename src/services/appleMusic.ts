@@ -3,6 +3,7 @@ import type { Genre, Cassette, Track } from '../types/music'
 import { buildNormalizer } from './featureNormalize'
 import type { NormalizedFeatures } from './featureNormalize'
 import { mapPool } from '../lib/mapPool'
+import { usePlayerStore } from '../store/playerStore'
 
 const DEVELOPER_TOKEN = import.meta.env.VITE_APPLE_MUSIC_DEVELOPER_TOKEN ?? ''
 
@@ -316,6 +317,9 @@ export function sortTracksByFilters(
  * can unlatch any pending-play UI state.
  */
 export async function playQueueFrom(tracks: Track[], startIndex: number): Promise<boolean> {
+  // Any window re-issue synchronizes MusicKit with the current queue — pending
+  // mid-play re-sort staleness (queueDirty) is moot from here on.
+  usePlayerStore.getState().setQueueDirty(false)
   const music = getMusicKitInstance()
   const items = tracks
     .slice(startIndex, startIndex + 20)

@@ -117,6 +117,11 @@ export function PlaylistController() {
         // via playQueueFrom (see CassettePlayer.handlePlay), which is the proven
         // setQueue-then-play path.
         s.setCurrentTrackIndex(0)
+      } else {
+        // Re-sorted while MusicKit is mid-playback: its internal window still
+        // holds the old order. Flag it; the next track boundary re-issues the
+        // window from the fresh queue (see onNowPlayingChange in CassettePlayer).
+        s.setQueueDirty(true)
       }
     },
     [],

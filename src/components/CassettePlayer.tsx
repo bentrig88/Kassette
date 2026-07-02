@@ -36,6 +36,7 @@ export function CassettePlayer() {
   const queuedTracks         = usePlayerStore((s) => s.queuedTracks)
   const isInserted           = usePlayerStore((s) => s.isInserted)
   const playbackState        = usePlayerStore((s) => s.playbackState)
+  const queueDirty           = usePlayerStore((s) => s.queueDirty)
   const volume               = usePlayerStore((s) => s.volume)
   const quality              = usePlayerStore((s) => s.quality)
   const currentTrackIndex    = usePlayerStore((s) => s.currentTrackIndex)
@@ -94,6 +95,27 @@ export function CassettePlayer() {
     const onNowPlayingChange = () => {
       const nowId = music.nowPlayingItem?.id
       const q = queuedTracksRef.current.length > 0 ? queuedTracksRef.current : (currentCassetteRef.current?.tracks ?? [])
+
+      // Boundary re-sync: the queue was re-sorted mid-playback, so MusicKit
+      // just auto-advanced along its STALE window. If it started a different
+      // track than our sorted queue intends, re-issue the window from the
+      // fresh queue (the stale track plays only for a beat — the least
+      // disruptive point to correct, vs. interrupting mid-track).
+      // playQueueFrom clears the flag, so manual next/prev/play (which already
+      // re-issue the window) never trip this path.
+      const store = usePlayerStore.getState()
+      if (store.queueDirty) {
+        store.setQueueDirty(false)
+        const intendedIdx = currentTrackIndexRef.current + 1
+        const intended = q[intendedIdx]
+        if (intended && nowId && intended.id !== nowId) {
+          setCurrentTrackIndex(intendedIdx)
+          setCurrentTime(0)
+          playQueueFrom(q, intendedIdx).catch(() => {})
+          return
+        }
+      }
+
       const idx = nowId ? q.findIndex((t) => t.id === nowId) : -1
       // Not found (e.g. the playing track was filtered out of a rebuilt queue
       // mid-play): keep the previous index rather than jumping the LCD to 0.
@@ -271,10 +293,12 @@ export function CassettePlayer() {
   const currentTrack = displayQueue[currentTrackIndex]
   let nextTrack = displayQueue[currentTrackIndex + 1]
   // While MusicKit drives playback its internal 20-track window may hold a
-  // pre-re-sort order (slider re-sorts deliberately don't re-sync it) — show
-  // ITS actual next item so the NEXT line never lies. With no internal next
-  // (window end) the fallback above is what the completed handler will play.
-  if (playbackState !== 'stopped') {
+  // pre-re-sort order — show ITS actual next item so the NEXT line never lies.
+  // Exception: queueDirty means a mid-play re-sort is pending and the next
+  // track boundary will re-issue the window from OUR queue, so the sorted
+  // queue's next (the fallback above) is what will actually play. With no
+  // internal next (window end) the fallback is likewise what plays next.
+  if (playbackState !== 'stopped' && !queueDirty) {
     try {
       const mq = getMusicKitInstance().queue
       const item = mq.items[mq.position + 1]

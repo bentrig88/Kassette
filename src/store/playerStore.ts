@@ -18,6 +18,13 @@ interface PlayerState {
   energyFilter: number  // 0–100 (low → high energy)
   moodFilter: number    // 0–100 (sad → happy)
 
+  // True when queuedTracks was re-sorted while MusicKit was mid-playback (its
+  // internal 20-track window then holds the OLD order). Checked at the next
+  // track boundary, which re-issues the window from the fresh queue; cleared
+  // by every playQueueFrom (any manual window sync makes it moot).
+  queueDirty: boolean
+  setQueueDirty: (dirty: boolean) => void
+
   // Audio features keyed by track ID — grows as tracks are analyzed
   featuresMap: Map<string, TrackFeatures>
   analyzedCount: number
@@ -58,6 +65,9 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   energyFilter: 50,
   moodFilter: 50,
 
+  queueDirty: false,
+  setQueueDirty: (dirty) => set({ queueDirty: dirty }),
+
   featuresMap: new Map(),
   analyzedCount: 0,
 
@@ -65,13 +75,13 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setInsertSourceRect: (rect) => set({ insertSourceRect: rect }),
 
   insertCassette: (cassette) =>
-    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [] }),
+    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [], queueDirty: false }),
 
   setQueuedTracks: (tracks) => set({ queuedTracks: tracks }),
   setBaseQueue: (tracks) => set({ baseQueue: tracks }),
 
   ejectCassette: () =>
-    set({ currentCassette: null, queuedTracks: [], baseQueue: [], isInserted: false, playbackState: 'stopped', currentTime: 0, duration: 0 }),
+    set({ currentCassette: null, queuedTracks: [], baseQueue: [], isInserted: false, playbackState: 'stopped', currentTime: 0, duration: 0, queueDirty: false }),
 
   setPlaybackState: (state) => set({ playbackState: state }),
   setVolume: (volume) => set({ volume }),
