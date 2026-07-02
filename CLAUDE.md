@@ -245,7 +245,7 @@ Both cancel cleanly on unmount / queue change (a `cancelled` flag passed to `map
 - Keeps MusicKit's queue in sync with our sorted `queuedTracks` so auto-advance and manual skip both follow the correct order.
 
 ### Slider Auto-Snap
-When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag).
+When a new track starts, the three sliders automatically move to reflect that track's **library-relative percentile** (`pace`/`energy`/`mood`) position. This is purely visual — it does NOT re-trigger the sort. The snap only fires on track change (`currentTrack.id`), not when analysis data arrives mid-play (to avoid overriding the user's intentional drag). **Suppressed while `playbackState === 'stopped'`**: a stopped-state "now" change is caused by the user re-filtering (sliders/subgenres rebuild the queue), and snapping would overwrite the slider values they just set.
 
 ### Sliders Disabled State
 If fewer than 5 upcoming tracks have analysis data, the sliders are grayed out (`pointer-events: none`) with the message "Analyzing your tape… N/20 tracks ready". They unlock automatically as analysis progresses.
@@ -537,7 +537,7 @@ Custom checkbox dropdown (native `<select>` can't do checkboxes) in the header's
 ### Filtering logic (`applyAll`)
 Rebuilds the upcoming queue: `played = queuedTracks[0..currentTrackIndex]`, then candidates from a pool minus played, optionally filtered to tracks whose `genreNames` intersect the selected subgenres (ANY match), then `sortTracksByFilters`.
 - **Pool:** when subgenres are selected → the FULL `currentCassette.tracks` (so niche subgenres beyond the shuffled 100-track queue still surface). When "All" → `baseQueue` (the full shuffled queue captured at insert — `playerStore.baseQueue`), preserving the per-insert shuffle. Options come from the full cassette to match the subgenre pool (avoids listing subgenres that would filter to empty).
-- **"Now" refresh when stopped:** a subgenre change while `playbackState === 'stopped'` rebuilds the WHOLE queue (played = []) and resets `currentTrackIndex` to 0, so the NOW track reflects the new selection; the next Play re-syncs MusicKit via `playQueueFrom`. While playing/paused the current track is preserved and only the upcoming list changes. Slider drags never trigger a MusicKit re-sync (avoids thrash).
+- **"Now" refresh when stopped:** ANY filter change (slider drag OR subgenre change) while `playbackState === 'stopped'` rebuilds the WHOLE queue (played = []) and resets `currentTrackIndex` to 0, so the NOW track reflects the new filters; the next Play re-syncs MusicKit via `playQueueFrom`. While playing/paused the current track is preserved and only the upcoming list changes. Filter changes never trigger a MusicKit re-sync directly (avoids thrash). The slider auto-snap is suppressed while stopped so the rebuild can't overwrite the user's slider positions mid-drag.
 
 ---
 

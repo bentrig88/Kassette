@@ -75,14 +75,17 @@ export function PlaylistController() {
   // (empty dep array) — applyAll is only ever called from event handlers, never
   // during render, so getState() always returns the latest committed state.
   const applyAll = useCallback(
-    (tempo: number, energy: number, mood: number, subs: string[], rebuildNow = false) => {
+    (tempo: number, energy: number, mood: number, subs: string[]) => {
       const s = usePlayerStore.getState()
       if (!s.isInserted) return
 
-      // When nothing is playing, a subgenre change rebuilds the WHOLE queue
-      // (including the "now" track) so it reflects the new selection; otherwise
-      // the current track is preserved and only the upcoming list changes.
-      const rebuild = rebuildNow && s.playbackState === 'stopped'
+      // When nothing is playing, ANY filter change (sliders or subgenres)
+      // rebuilds the WHOLE queue — including the "now" track — so the NOW
+      // display reflects the new filters; otherwise the current track is
+      // preserved and only the upcoming list changes. (The slider auto-snap in
+      // CassettePlayer is suppressed while stopped so this rebuild can't yank
+      // the sliders back out of the user's hands.)
+      const rebuild = s.playbackState === 'stopped'
       const played = rebuild ? [] : s.queuedTracks.slice(0, s.currentTrackIndex + 1)
       const playedIds = new Set(played.map((t) => t.id))
 
@@ -126,7 +129,7 @@ export function PlaylistController() {
 
   function handleSubgenres(next: string[]) {
     setSubgenres(next)
-    applyAll(tempoFilter, energyFilter, moodFilter, next, true)
+    applyAll(tempoFilter, energyFilter, moodFilter, next)
   }
 
   const upcoming = useMemo(
