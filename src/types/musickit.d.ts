@@ -45,6 +45,7 @@ declare namespace MusicKit {
     data: {
       data: MediaItem[]
       next?: string
+      meta?: { total?: number }
     }
   }
 

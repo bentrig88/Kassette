@@ -2,6 +2,7 @@ import { GENRES, GENRE_KEYWORDS, GENRE_COLORS } from '../types/music'
 import type { Genre, Cassette, Track } from '../types/music'
 import { buildNormalizer } from './featureNormalize'
 import type { NormalizedFeatures } from './featureNormalize'
+import { mapPool } from '../lib/mapPool'
 
 const DEVELOPER_TOKEN = import.meta.env.VITE_APPLE_MUSIC_DEVELOPER_TOKEN ?? ''
 
@@ -48,40 +49,82 @@ export function isAuthorized(): boolean {
 }
 
 /**
- * Fetches all library songs with pagination.
- * Apple Music API returns max 100 per page.
+ * Fetches all library songs (Apple Music API returns max 100 per page).
+ *
+ * The first page reveals the library's true size (`meta.total`), so the
+ * remaining pages are fetched IN PARALLEL with bounded concurrency — a large
+ * library is dominated by round-trip latency, and the old one-page-at-a-time
+ * loop took 50–150 sequential requests. Knowing the total also makes the
+ * progress callback honest (the old running estimate pinned the loading bar
+ * near-full for the whole fetch). Falls back to sequential `next`-based paging
+ * if the API ever omits `meta.total`.
  */
+const PAGE_LIMIT = 100
+const PAGE_CONCURRENCY = 5
+
 export async function fetchLibraryTracks(
   onProgress?: (loaded: number, total: number, tracksSoFar: Track[]) => void
 ): Promise<Track[]> {
   const music = MusicKit.getInstance()
-  const tracks: Track[] = []
-  const limit = 100
-  let offset = 0
-  let hasMore = true
 
-  while (hasMore) {
-    const response = await music.api.music('/v1/me/library/songs', {
-      limit,
-      offset,
-    })
-
-    const items = response.data.data
-    for (const item of items) {
-      rawItemCache.set(item.id, item)
-      tracks.push(mapMediaItemToTrack(item))
-    }
-
-    if (response.data.next && items.length === limit) {
-      offset += limit
-      onProgress?.(tracks.length, tracks.length + limit, tracks)
-    } else {
-      hasMore = false
-      onProgress?.(tracks.length, tracks.length, tracks)
+  async function fetchPage(offset: number) {
+    const request = () => music.api.music('/v1/me/library/songs', { limit: PAGE_LIMIT, offset })
+    try {
+      return (await request()).data
+    } catch {
+      // One retry after a short backoff (transient 429 / network hiccup)
+      await new Promise((r) => setTimeout(r, 1000))
+      return (await request()).data
     }
   }
 
-  return tracks
+  function toTracks(items: MusicKit.MediaItem[]): Track[] {
+    return items.map((item) => {
+      rawItemCache.set(item.id, item)
+      return mapMediaItemToTrack(item)
+    })
+  }
+
+  const firstPage = await fetchPage(0)
+  const firstTracks = toTracks(firstPage.data)
+  const total = firstPage.meta?.total
+
+  if (typeof total !== 'number' || total <= 0) {
+    // No meta.total — sequential next-based paging with the running estimate.
+    const tracks = [...firstTracks]
+    let offset = PAGE_LIMIT
+    let hasMore = Boolean(firstPage.next) && firstPage.data.length === PAGE_LIMIT
+    onProgress?.(tracks.length, hasMore ? tracks.length + PAGE_LIMIT : tracks.length, tracks)
+    while (hasMore) {
+      const page = await fetchPage(offset)
+      tracks.push(...toTracks(page.data))
+      hasMore = Boolean(page.next) && page.data.length === PAGE_LIMIT
+      offset += PAGE_LIMIT
+      onProgress?.(tracks.length, hasMore ? tracks.length + PAGE_LIMIT : tracks.length, tracks)
+    }
+    return tracks
+  }
+
+  onProgress?.(firstTracks.length, total, firstTracks)
+  if (firstTracks.length >= total) return firstTracks
+
+  const offsets: number[] = []
+  for (let o = PAGE_LIMIT; o < total; o += PAGE_LIMIT) offsets.push(o)
+  console.log(`[Kassette] Library: ${total} tracks — fetching ${offsets.length} pages, ${PAGE_CONCURRENCY} in parallel`)
+
+  // `arrived` accumulates in completion order (fine for the loading-screen LCD
+  // pool); the returned array is assembled in offset order for determinism.
+  const arrived: Track[] = [...firstTracks]
+  const pages: Track[][] = new Array(offsets.length)
+  await mapPool(offsets, PAGE_CONCURRENCY, async (offset, i) => {
+    const page = await fetchPage(offset)
+    const pageTracks = toTracks(page.data)
+    pages[i] = pageTracks
+    arrived.push(...pageTracks)
+    onProgress?.(arrived.length, total, arrived)
+  })
+
+  return [...firstTracks, ...pages.flat()]
 }
 
 function mapMediaItemToTrack(item: MusicKit.MediaItem): Track {
