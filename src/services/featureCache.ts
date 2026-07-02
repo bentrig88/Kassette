@@ -5,15 +5,16 @@
 
 export interface TrackFeatures {
   id: string
-  bpm: number        // actual detected beats per minute (folded into 60–150)
-  energyRaw: number  // raw linear RMS — normalized library-relative on read
-  moodRaw: number    // raw zero-crossing rate (Hz) — normalized library-relative on read
+  bpm: number            // detected BPM (RhythmExtractor2013), clamped to 50–200
+  bpmConfidence?: number // 0–1 (multifeature confidence / 5.32); persisted but not yet consumed
+  energyRaw: number      // Essentia Loudness (energy^0.67) — normalized library-relative on read
+  moodRaw: number        // 0–1 brightness (spectral centroid) + major/minor mode blend — normalized library-relative on read
   analyzedAt: number
 }
 
 const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
-const VERSION = 6 // bumped: BPM now spectral-flux + tempo prior (was energy-envelope) — re-analyze
+const VERSION = 7 // bumped: DSP migrated to Essentia.js (RhythmExtractor2013/KeyExtractor/Loudness) — re-analyze
 
 let _dbPromise: Promise<IDBDatabase> | null = null
 
