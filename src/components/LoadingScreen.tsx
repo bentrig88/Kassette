@@ -15,6 +15,8 @@ interface Props {
   libraryProgress: number   // 0–100
   libraryDone: boolean
   tracksPool: Track[]
+  /** Focused genre's tape-selection background (null until cassettes exist). */
+  firstBackgroundUrl: string | null
   onComplete: () => void
 }
 
@@ -23,7 +25,7 @@ function randInt(min: number, max: number) {
   return Math.floor(min + Math.random() * (max - min + 1))
 }
 
-export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComplete }: Props) {
+export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, firstBackgroundUrl, onComplete }: Props) {
   const featuresMap = usePlayerStore((s) => s.featuresMap)
   const [phase, setPhase] = useState<'red' | 'concrete'>('red')
   const [exiting, setExiting] = useState(false)
@@ -89,17 +91,35 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComp
     return () => clearInterval(id)
   }, [])
 
-  // Begin the exit fade when library + assets are ready AND the intro elapsed.
-  // The player is already mounted underneath (App renders it once cassettes
-  // exist), so fading .ls-root out crossfades to it.
+  // The tape-selection screen's focused genre background is lazy-loaded; if
+  // the overlay drops before that photo is decoded, the player blinks through
+  // the transparent background layer for a few frames. Hold the exit until
+  // it's fully decoded (safety timeout so a failed image can't trap the user).
+  const [bgReady, setBgReady] = useState(false)
+  useEffect(() => {
+    if (!firstBackgroundUrl) return
+    let cancelled = false
+    const ready = () => { if (!cancelled) setBgReady(true) }
+    const img = new Image()
+    img.src = firstBackgroundUrl
+    img.decode().then(ready, ready)
+    const safety = setTimeout(ready, 5000)
+    return () => { cancelled = true; clearTimeout(safety) }
+  }, [firstBackgroundUrl])
+
+  // Begin the exit fade when library + assets + the focused genre background
+  // are ready AND the intro elapsed. The player is already mounted underneath
+  // (App renders it once cassettes exist), so fading .ls-root out crossfades
+  // to it. (No firstBackgroundUrl with libraryDone = zero cassettes — the
+  // empty state has no genre background to wait for.)
   const firedRef = useRef(false)
   useEffect(() => {
     if (firedRef.current) return
-    if (libraryDone && assetDone && phase === 'concrete') {
+    if (libraryDone && assetDone && (firstBackgroundUrl ? bgReady : true) && phase === 'concrete') {
       firedRef.current = true
       setExiting(true)
     }
-  }, [libraryDone, assetDone, phase])
+  }, [libraryDone, assetDone, bgReady, firstBackgroundUrl, phase])
 
   const combined = 0.5 * (Math.min(100, libraryProgress) / 100) + 0.5 * assetProgress
   const concrete = phase === 'concrete'

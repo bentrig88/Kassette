@@ -12,6 +12,7 @@ import {
   restoreRawItems,
 } from './services/appleMusic'
 import { loadLibrarySnapshot, saveLibrarySnapshot, clearLibrarySnapshot } from './services/libraryCache'
+import { backgroundForGenre } from './assets/background/genreBackgrounds'
 import { getAllFeatures } from './services/featureCache'
 import { useBackgroundAnalysis } from './hooks/useBackgroundAnalysis'
 import { AuthScreen } from './components/AuthScreen'
@@ -236,6 +237,7 @@ export default function App() {
           libraryProgress={loadingProgress}
           libraryDone={!isLoading && loadingProgress >= 100}
           tracksPool={tracksSoFar}
+          firstBackgroundUrl={cassettes.length > 0 ? backgroundForGenre(cassettes[0].genre) : null}
           onComplete={() => setLoadingComplete(true)}
         />
       )}
