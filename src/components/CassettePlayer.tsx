@@ -323,7 +323,7 @@ export function CassettePlayer() {
     const store = usePlayerStore.getState()
     if (store.playbackState === 'stopped') return
     const f = store.featuresMap.get(currentTrack.id)
-    if (!f) return
+    if (!f || f.unanalyzable) return
     const n = buildNormalizer(store.featuresMap).normalize(f)
     store.snapFilters(n.pace, n.energy, n.mood)
   // eslint-disable-next-line react-hooks/exhaustive-deps

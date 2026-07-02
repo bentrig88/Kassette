@@ -48,6 +48,7 @@ export function buildNormalizer(featuresMap: Map<string, TrackFeatures>): Featur
   const energies: number[] = []
   const moods: number[] = []
   for (const f of featuresMap.values()) {
+    if (f.unanalyzable) continue // tombstones carry zeroed sentinels, not data
     bpms.push(f.bpm)
     energies.push(f.energyRaw)
     moods.push(f.moodRaw)

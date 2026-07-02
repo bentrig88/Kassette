@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
-import { getFeatures, setFeatures } from '../services/featureCache'
+import { getFeatures, setFeatures, makeTombstone } from '../services/featureCache'
 import { getSharedAudioContext, beginAnalysis, endAnalysis } from '../lib/analysisShared'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
@@ -49,7 +49,15 @@ export function usePreviewAnalysis(tracks: Track[]) {
 
       await mapPool(uncached, CONCURRENCY, async (track) => {
         const url = previewMap.get(track.id)
-        if (!url) return
+        if (!url) {
+          // No catalog entry / no preview clip — permanently unanalyzable.
+          // Tombstone it so it stops counting toward "N/M analyzed" and is
+          // never retried. (Transient fetch/decode errors below stay retryable.)
+          const tomb = makeTombstone(track.id)
+          await setFeatures(tomb).catch(() => {})
+          addFeatures(tomb)
+          return
+        }
         if (!beginAnalysis(track.id)) return   // another pass owns it
         try {
           const res = await fetch(url)

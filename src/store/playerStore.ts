@@ -107,17 +107,26 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setEnergyFilter: (value) => set({ energyFilter: value }),
   setMoodFilter: (value) => set({ moodFilter: value }),
 
+  // analyzedCount counts REAL analyses only — unanalyzable tombstones live in
+  // featuresMap (so lookups know about them) but don't count as data.
   addFeatures: (features) =>
     set((s) => {
+      const prev = s.featuresMap.get(features.id)
       const next = new Map(s.featuresMap)
       next.set(features.id, features)
-      return { featuresMap: next, analyzedCount: next.size }
+      const delta = (features.unanalyzable ? 0 : 1) - (prev && !prev.unanalyzable ? 1 : 0)
+      return { featuresMap: next, analyzedCount: s.analyzedCount + delta }
     }),
 
   bulkAddFeatures: (features) =>
     set((s) => {
       const next = new Map(s.featuresMap)
-      for (const f of features) next.set(f.id, f)
-      return { featuresMap: next, analyzedCount: next.size }
+      let count = s.analyzedCount
+      for (const f of features) {
+        const prev = next.get(f.id)
+        next.set(f.id, f)
+        count += (f.unanalyzable ? 0 : 1) - (prev && !prev.unanalyzable ? 1 : 0)
+      }
+      return { featuresMap: next, analyzedCount: count }
     }),
 }))

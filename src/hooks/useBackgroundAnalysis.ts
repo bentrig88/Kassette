@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '../store/playerStore'
 import { fetchPreviewUrls } from '../services/appleMusic'
 import { analyzeAudioBuffer } from '../services/analysisClient'
-import { getFeatures, setFeatures, getAllKeys } from '../services/featureCache'
+import { getFeatures, setFeatures, getAllKeys, makeTombstone } from '../services/featureCache'
 import { getSharedAudioContext, beginAnalysis, endAnalysis } from '../lib/analysisShared'
 import { mapPool } from '../lib/mapPool'
 import type { Track } from '../types/music'
@@ -54,7 +54,14 @@ export function useBackgroundAnalysis(tracks: Track[]) {
         // active-queue pass may have covered it).
         if (await getFeatures(track.id) !== null) return
         const url = previewMap.get(track.id)
-        if (!url) return
+        if (!url) {
+          // Permanently unanalyzable (no catalog entry / no preview clip) —
+          // tombstone so it is excluded from counts and never retried.
+          const tomb = makeTombstone(track.id)
+          await setFeatures(tomb).catch(() => {})
+          addFeatures(tomb)
+          return
+        }
         if (!beginAnalysis(track.id)) return
         try {
           const res = await fetch(url)

@@ -21,10 +21,12 @@ function TrackDisplayBase({ currentTrack, nextTrack, currentTime, duration, prog
   const featuresMap = usePlayerStore((s) => s.featuresMap)
   const normalizer = useMemo(() => buildNormalizer(featuresMap), [featuresMap])
 
+  // Tombstoned tracks (no preview clip) have no real features — show NO
+  // PREVIEW rather than the (false) ANALYZING… promise.
   const currentFeatures: TrackFeatures | undefined = currentTrack ? featuresMap.get(currentTrack.id) : undefined
-  const currentNorm = currentFeatures ? normalizer.normalize(currentFeatures) : undefined
+  const currentNorm = currentFeatures && !currentFeatures.unanalyzable ? normalizer.normalize(currentFeatures) : undefined
   const nextFeatures: TrackFeatures | undefined = nextTrack ? featuresMap.get(nextTrack.id) : undefined
-  const nextNorm = nextFeatures ? normalizer.normalize(nextFeatures) : undefined
+  const nextNorm = nextFeatures && !nextFeatures.unanalyzable ? normalizer.normalize(nextFeatures) : undefined
 
   return (
     <TrackScreen
@@ -35,6 +37,7 @@ function TrackDisplayBase({ currentTrack, nextTrack, currentTime, duration, prog
       nowMeta={currentFeatures && currentNorm
         ? { bpm: currentFeatures.bpm, nrg: currentNorm.energy, mood: currentNorm.mood }
         : null}
+      nowMetaFallback={currentFeatures?.unanalyzable ? 'NO PREVIEW' : undefined}
       next={nextTrack ? { name: nextTrack.name, artistName: nextTrack.artistName } : null}
       nextMeta={nextFeatures && nextNorm
         ? { bpm: nextFeatures.bpm, nrg: nextNorm.energy, mood: nextNorm.mood }

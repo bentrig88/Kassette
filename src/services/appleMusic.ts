@@ -279,7 +279,8 @@ export function sortTracksByFilters(
   const analyzed: Track[] = []
   const unanalyzed: Track[] = []
   for (const t of tracks) {
-    if (featuresMap.has(t.id)) analyzed.push(t)
+    const f = featuresMap.get(t.id)
+    if (f && !f.unanalyzable) analyzed.push(t)
     else unanalyzed.push(t)
   }
 
