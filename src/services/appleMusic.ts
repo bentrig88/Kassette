@@ -34,6 +34,10 @@ export async function configureMusicKit(): Promise<void> {
     app: {
       name: 'Kassette',
       build: '1.0.0',
+      // Shown large in Apple's Access Request popup; without it Apple falls
+      // back to the site favicon rendered tiny. origin-relative so it works
+      // on localhost, Vercel previews, and production alike.
+      icon: `${window.location.origin}/apple-touch-icon.png`,
     },
   })
 
