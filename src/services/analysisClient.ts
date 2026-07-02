@@ -79,13 +79,20 @@ async function toMonoPCM(buffer: AudioBuffer): Promise<Float32Array> {
 /**
  * Resample `buffer` and run feature analysis in the worker pool. Rejects if the
  * worker reports an error (callers already skip failed tracks).
+ *
+ * `method`: 'multifeature' (accurate + confidence; the active-tape pass) or
+ * 'degara' (~4-5x faster, no confidence; the background library pass).
  */
-export async function analyzeAudioBuffer(id: string, buffer: AudioBuffer): Promise<TrackFeatures> {
+export async function analyzeAudioBuffer(
+  id: string,
+  buffer: AudioBuffer,
+  method: import('./audioAnalysis').RhythmMethod = 'multifeature',
+): Promise<TrackFeatures> {
   const samples = await toMonoPCM(buffer)
   const reqId = ++seq
   return new Promise<TrackFeatures>((resolve, reject) => {
     const worker = nextWorker()
     pending.set(reqId, { resolve, reject, worker })
-    worker.postMessage({ reqId, id, samples, sampleRate: TARGET_RATE }, [samples.buffer])
+    worker.postMessage({ reqId, id, samples, sampleRate: TARGET_RATE, method }, [samples.buffer])
   })
 }

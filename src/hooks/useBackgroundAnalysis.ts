@@ -60,7 +60,9 @@ export function useBackgroundAnalysis(tracks: Track[]) {
           const res = await fetch(url)
           if (!res.ok) return
           const buf = await audioCtx.decodeAudioData(await res.arrayBuffer())
-          const features = await analyzeAudioBuffer(track.id, buf)
+          // degara: ~4-5x faster than multifeature — right trade for bulk
+          // coverage (the active cassette's pass keeps multifeature accuracy).
+          const features = await analyzeAudioBuffer(track.id, buf, 'degara')
           await setFeatures(features)
           addFeatures(features)
         } catch {/* skip on CORS or decode error */}
