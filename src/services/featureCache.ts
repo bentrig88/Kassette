@@ -5,10 +5,14 @@
 
 export interface TrackFeatures {
   id: string
-  bpm: number            // detected BPM (RhythmExtractor2013), clamped to 50–200
-  bpmConfidence?: number // 0–1 (multifeature confidence / 5.32); shrinks pace toward neutral in the sort
-  energyRaw: number      // Essentia Loudness (energy^0.67) — normalized library-relative on read
-  moodRaw: number        // 0–1 brightness (spectral centroid) + major/minor mode blend — normalized library-relative on read
+  bpm: number               // RhythmExtractor2013, clamped 50–200
+  bpmConfidence?: number    // 0–1 (multifeature only; omitted for degara)
+  loudness: number          // Loudness (Steven's-law energy^0.67)
+  onsetRate: number         // OnsetRate — onsets per second (activity)
+  dynamicComplexity: number // DynamicComplexity — loudness fluctuation
+  centroidHz: number        // SpectralCentroidTime — brightness
+  modeScore: number         // 0–1: major → 0.5+0.5·strength, minor → 0.5−0.5·strength
+  danceability: number      // Danceability — groove/pulse strength
   analyzedAt: number
   // Tombstone: the track can NEVER be analyzed (no catalog entry / no preview
   // clip). Cached so it is excluded from analysis retries, normalizer
@@ -19,12 +23,16 @@ export interface TrackFeatures {
 
 /** Cache entry marking a track as permanently unanalyzable (no preview). */
 export function makeTombstone(id: string): TrackFeatures {
-  return { id, bpm: 0, energyRaw: 0, moodRaw: 0, analyzedAt: Date.now(), unanalyzable: true }
+  return {
+    id, bpm: 0, loudness: 0, onsetRate: 0, dynamicComplexity: 0,
+    centroidHz: 0, modeScore: 0, danceability: 0,
+    analyzedAt: Date.now(), unanalyzable: true,
+  }
 }
 
 const DB_NAME = 'kassette-features'
 const STORE = 'tracks'
-const VERSION = 7 // bumped: DSP migrated to Essentia.js (RhythmExtractor2013/KeyExtractor/Loudness) — re-analyze
+const VERSION = 8 // bumped: component-based features (loudness/onsetRate/dynamicComplexity/centroidHz/modeScore/danceability) — re-analyze
 
 let _dbPromise: Promise<IDBDatabase> | null = null
 

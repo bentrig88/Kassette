@@ -4,13 +4,12 @@
  * library). Returns RAW measurements; absolute 0–100 scaling happens
  * library-relative in featureNormalize.ts.
  *
- * bpm           — RhythmExtractor2013 'multifeature', clamped to 50–200
+ * bpm           — RhythmExtractor2013 (multifeature or degara), clamped to 50–200
  * bpmConfidence — RhythmExtractor2013 confidence rescaled to 0–1 (raw 0–5.32)
- * energyRaw     — Loudness (Steven's-law energy^0.67, a perceptual intensity)
- * moodRaw       — 0–1 blend of brightness (SpectralCentroidTime, 4 kHz ceiling)
- *                 and musical mode (KeyExtractor major/minor × strength):
- *                 0.6·brightness + 0.4·mode — same weighting as the old DSP so
- *                 the Mood slider's meaning is continuous.
+ * Raw components (loudness, onsetRate, dynamicComplexity, centroidHz,
+ * modeScore, danceability) are stored per track; the Energy/Mood slider
+ * values are composed from library percentiles in featureNormalize.ts, so
+ * blend weights can be re-tuned without re-analysis.
  *
  * Expects 44100 Hz input: RhythmExtractor2013 has no sampleRate param and
  * assumes 44100 (analysisClient's TARGET_RATE matches).
@@ -21,9 +20,6 @@ import type { TrackFeatures } from './featureCache'
 
 // RhythmExtractor2013 'multifeature' confidence is on a 0–5.32 scale.
 const CONFIDENCE_MAX = 5.32
-// Spectral-centroid Hz ceiling for the 0–1 brightness term. The exact value is
-// uncritical — the percentile normalizer rescales library-relative anyway.
-const BRIGHTNESS_CEILING_HZ = 4000
 
 // One Essentia instance per worker, created lazily and reused. The WASM module
 // is base64-embedded in the ES build and instantiates synchronously, but keep
@@ -73,17 +69,28 @@ export async function analyzePCM(
     // "no confidence" (the sort treats absent as fully confident).
     const bpmConfidence = method === 'multifeature' ? clamp01(rhythm.confidence / CONFIDENCE_MAX) : undefined
 
-    // ── Energy (perceptual loudness) ────────────────────────────
-    const energyRaw = essentia.Loudness(signal).loudness
+    // ── Raw components (percentile-ranked + blended in featureNormalize) ──
+    const loudness = essentia.Loudness(signal).loudness
 
-    // ── Mood (brightness × mode blend, 0–1) ─────────────────────
+    const onsets = essentia.OnsetRate(signal)
+    onsets.onsets.delete()
+    const onsetRate = onsets.onsetRate
+
+    const dynamicComplexity = essentia.DynamicComplexity(signal).dynamicComplexity
+
     const { scale, strength } = essentia.KeyExtractor(signal)
     const modeScore = clamp01(scale === 'major' ? 0.5 + 0.5 * strength : 0.5 - 0.5 * strength)
-    const centroidHz = essentia.SpectralCentroidTime(signal, sampleRate).centroid
-    const brightness = clamp01(centroidHz / BRIGHTNESS_CEILING_HZ)
-    const moodRaw = 0.6 * brightness + 0.4 * modeScore
 
-    return { id, bpm, bpmConfidence, energyRaw, moodRaw, analyzedAt: Date.now() }
+    const centroidHz = essentia.SpectralCentroidTime(signal, sampleRate).centroid
+
+    const dance = essentia.Danceability(signal)
+    dance.dfa.delete()
+    const danceability = dance.danceability
+
+    return {
+      id, bpm, bpmConfidence, loudness, onsetRate, dynamicComplexity,
+      centroidHz, modeScore, danceability, analyzedAt: Date.now(),
+    }
   } finally {
     signal.delete()
   }

@@ -29,6 +29,9 @@ declare module 'essentia.js/dist/essentia.js-core.es.js' {
     Loudness(signal: EssentiaVector): { loudness: number }
     KeyExtractor(signal: EssentiaVector): { key: string; scale: 'major' | 'minor'; strength: number }
     SpectralCentroidTime(signal: EssentiaVector, sampleRate?: number): { centroid: number }
+    OnsetRate(signal: EssentiaVector): { onsets: EssentiaVector; onsetRate: number }
+    DynamicComplexity(signal: EssentiaVector): { dynamicComplexity: number; loudness: number }
+    Danceability(signal: EssentiaVector): { danceability: number; dfa: EssentiaVector }
   }
 }
 
