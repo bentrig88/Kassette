@@ -49,9 +49,6 @@ export function CassettePlayer() {
   const setCurrentTrackIndex = usePlayerStore((s) => s.setCurrentTrackIndex)
   const setCurrentTime       = usePlayerStore((s) => s.setCurrentTime)
   const setDuration          = usePlayerStore((s) => s.setDuration)
-  const setTempoFilter       = usePlayerStore((s) => s.setTempoFilter)
-  const setEnergyFilter      = usePlayerStore((s) => s.setEnergyFilter)
-  const setMoodFilter        = usePlayerStore((s) => s.setMoodFilter)
 
   const isPlaying = playbackState === 'playing'
 
@@ -319,18 +316,18 @@ export function CassettePlayer() {
   // Suppressed while stopped: a stopped-state "now" change comes from the user
   // re-filtering (sliders/subgenres rebuild the queue in PlaylistController) —
   // snapping would overwrite the very slider values they just set.
+  // snapFilters clears the touched flags: a snapped position is information
+  // about the playing track, not a user-set target.
   useEffect(() => {
     if (!currentTrack) return
-    if (usePlayerStore.getState().playbackState === 'stopped') return
-    const fm = usePlayerStore.getState().featuresMap
-    const f = fm.get(currentTrack.id)
-    if (!f) return
-    const n = buildNormalizer(fm).normalize(f)
-    setTempoFilter(n.pace)
-    setEnergyFilter(n.energy)
-    setMoodFilter(n.mood)
+    const store = usePlayerStore.getState()
+    if (store.playbackState === 'stopped') return
+    const f = store.featuresMap.get(currentTrack.id)
+    if (!f || f.unanalyzable) return
+    const n = buildNormalizer(store.featuresMap).normalize(f)
+    store.snapFilters(n.pace, n.energy, n.mood)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentTrack?.id, setTempoFilter, setEnergyFilter, setMoodFilter])
+  }, [currentTrack?.id])
 
   const progress = duration > 0 ? currentTime / duration : 0
 

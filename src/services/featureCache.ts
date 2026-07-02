@@ -6,10 +6,20 @@
 export interface TrackFeatures {
   id: string
   bpm: number            // detected BPM (RhythmExtractor2013), clamped to 50–200
-  bpmConfidence?: number // 0–1 (multifeature confidence / 5.32); persisted but not yet consumed
+  bpmConfidence?: number // 0–1 (multifeature confidence / 5.32); shrinks pace toward neutral in the sort
   energyRaw: number      // Essentia Loudness (energy^0.67) — normalized library-relative on read
   moodRaw: number        // 0–1 brightness (spectral centroid) + major/minor mode blend — normalized library-relative on read
   analyzedAt: number
+  // Tombstone: the track can NEVER be analyzed (no catalog entry / no preview
+  // clip). Cached so it is excluded from analysis retries, normalizer
+  // distributions, sort scoring, and "N/M analyzed" denominators. The numeric
+  // fields are zeroed sentinels — always check this flag before reading them.
+  unanalyzable?: true
+}
+
+/** Cache entry marking a track as permanently unanalyzable (no preview). */
+export function makeTombstone(id: string): TrackFeatures {
+  return { id, bpm: 0, energyRaw: 0, moodRaw: 0, analyzedAt: Date.now(), unanalyzable: true }
 }
 
 const DB_NAME = 'kassette-features'

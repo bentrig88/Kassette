@@ -43,6 +43,7 @@ export function PlaylistController() {
   const setTempoFilter = usePlayerStore((s) => s.setTempoFilter)
   const setEnergyFilter = usePlayerStore((s) => s.setEnergyFilter)
   const setMoodFilter = usePlayerStore((s) => s.setMoodFilter)
+  const markFilterTouched = usePlayerStore((s) => s.markFilterTouched)
   const featuresMap = usePlayerStore((s) => s.featuresMap)
   const currentCassette = usePlayerStore((s) => s.currentCassette)
   const currentTrackIndex = usePlayerStore((s) => s.currentTrackIndex)
@@ -109,7 +110,7 @@ export function PlaylistController() {
 
       let candidates = pool.filter((t) => !playedIds.has(t.id))
       if (subs.length > 0) candidates = candidates.filter((t) => t.genreNames.some((g) => subs.includes(g)))
-      const sortedUpcoming = sortTracksByFilters(candidates, s.featuresMap, tempo, energy, mood, buildNormalizer(s.featuresMap))
+      const sortedUpcoming = sortTracksByFilters(candidates, s.featuresMap, tempo, energy, mood, buildNormalizer(s.featuresMap), s.touchedFilters)
       s.setQueuedTracks([...played, ...sortedUpcoming])
 
       if (rebuild) {
@@ -129,16 +130,19 @@ export function PlaylistController() {
 
   function handleTempo(v: number) {
     setTempoFilter(v)
+    markFilterTouched('tempo')
     applyAll(v, energyFilter, moodFilter, subgenres, shuffledPool)
   }
 
   function handleEnergy(v: number) {
     setEnergyFilter(v)
+    markFilterTouched('energy')
     applyAll(tempoFilter, v, moodFilter, subgenres, shuffledPool)
   }
 
   function handleMood(v: number) {
     setMoodFilter(v)
+    markFilterTouched('mood')
     applyAll(tempoFilter, energyFilter, v, subgenres, shuffledPool)
   }
 
@@ -151,14 +155,27 @@ export function PlaylistController() {
     () => (queuedTracks.length > 0 ? queuedTracks : (currentCassette?.tracks ?? [])).slice(currentTrackIndex + 1),
     [queuedTracks, currentCassette, currentTrackIndex]
   )
-  const analyzedUpcoming = useMemo(
-    () => upcoming.filter((t) => featuresMap.has(t.id)).length,
-    [upcoming, featuresMap]
-  )
-  // Also require ≥5 analyzed tracks library-wide so the percentile normalizer
+  // Unanalyzable tombstones (no preview clip) are excluded from BOTH sides of
+  // the "N/M ready" fraction — they can never analyze, so counting them would
+  // stall the unlock (and the message) forever.
+  const { analyzedUpcoming, analyzableUpcoming } = useMemo(() => {
+    let analyzed = 0
+    let analyzable = 0
+    for (const t of upcoming) {
+      const f = featuresMap.get(t.id)
+      if (f?.unanalyzable) continue
+      analyzable++
+      if (f) analyzed++
+    }
+    return { analyzedUpcoming: analyzed, analyzableUpcoming: analyzable }
+  }, [upcoming, featuresMap])
+  // Also require ≥5 REAL analyses library-wide so the percentile normalizer
   // can actually rank (with ≤1 it returns a flat 50 and the sliders do nothing).
-  const enoughData = analyzedUpcoming >= Math.min(5, upcoming.length) && featuresMap.size >= 5
-  const disabled = !isInserted || !enoughData
+  const analyzedCount = usePlayerStore((s) => s.analyzedCount)
+  const enoughData = analyzedUpcoming >= Math.min(5, analyzableUpcoming) && analyzedCount >= 5
+  // Whole tape has no preview clips — filtering can never work; say so.
+  const noPreviews = upcoming.length > 0 && analyzableUpcoming === 0
+  const disabled = !isInserted || !enoughData || noPreviews
 
   return (
     <div className="pf-container">
@@ -166,11 +183,13 @@ export function PlaylistController() {
         <div className="pf-header-titles">
           <span className="pf-title">MIXTAPE FILTERS</span>
           <span className="pf-analyzed">
-            {isInserted && (!enoughData
-              ? (featuresMap.size < 5
-                  ? 'Analyzing your library…'
-                  : `Analyzing your tape… ${analyzedUpcoming}/${Math.min(upcoming.length, 20)} tracks ready`)
-              : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
+            {isInserted && (noPreviews
+              ? 'No previews available for this tape'
+              : !enoughData
+                ? (analyzedCount < 5
+                    ? 'Analyzing your library…'
+                    : `Analyzing your tape… ${analyzedUpcoming}/${Math.min(analyzableUpcoming, 20)} tracks ready`)
+                : analyzedUpcoming > 0 ? `${analyzedUpcoming} upcoming tracks analyzed` : '')}
           </span>
         </div>
         <SubgenreSelect

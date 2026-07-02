@@ -58,7 +58,7 @@ export function LoadingScreen({ libraryProgress, libraryDone, tracksPool, onComp
     function metaFor(track: Track | undefined): ScreenMeta {
       if (track) {
         const f = featRef.current.get(track.id)
-        if (f) {
+        if (f && !f.unanalyzable) {
           const n = normRef.current.normalize(f)
           return { bpm: f.bpm, nrg: n.energy, mood: n.mood }
         }

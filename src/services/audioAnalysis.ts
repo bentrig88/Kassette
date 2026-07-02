@@ -44,24 +44,34 @@ function getEssentia(): Promise<Essentia> {
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 
+export type RhythmMethod = 'multifeature' | 'degara'
+
 /**
  * Analyzes raw mono 44.1 kHz PCM and returns raw BPM / energy / mood measurements.
+ *
+ * `method` picks the RhythmExtractor2013 flavor: 'multifeature' (most accurate,
+ * ~2s/clip, returns a confidence) for the active cassette; 'degara' (~4-5x
+ * faster, NO confidence — the field is omitted) for the background
+ * whole-library pass.
  */
 export async function analyzePCM(
   id: string,
   data: Float32Array,
   sampleRate: number,
+  method: RhythmMethod = 'multifeature',
 ): Promise<TrackFeatures> {
   const essentia = await getEssentia()
   const signal = essentia.arrayToVector(data)
   try {
     // ── BPM + confidence ────────────────────────────────────────
-    const rhythm = essentia.RhythmExtractor2013(signal, 208, 'multifeature', 40)
+    const rhythm = essentia.RhythmExtractor2013(signal, 208, method, 40)
     rhythm.ticks.delete()
     rhythm.estimates.delete()
     rhythm.bpmIntervals.delete()
     const bpm = Math.round(Math.min(200, Math.max(50, rhythm.bpm)))
-    const bpmConfidence = clamp01(rhythm.confidence / CONFIDENCE_MAX)
+    // degara always reports 0 — omit the field rather than store a false
+    // "no confidence" (the sort treats absent as fully confident).
+    const bpmConfidence = method === 'multifeature' ? clamp01(rhythm.confidence / CONFIDENCE_MAX) : undefined
 
     // ── Energy (perceptual loudness) ────────────────────────────
     const energyRaw = essentia.Loudness(signal).loudness

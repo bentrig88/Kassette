@@ -23,6 +23,8 @@ interface Props {
   nowDuration: number
   nowProgress: number
   nowMeta: ScreenMeta | null
+  /** Meta-line text when nowMeta is null and a track exists (default ANALYZING…). */
+  nowMetaFallback?: string
   next: ScreenTrack | null
   nextMeta: ScreenMeta | null
 }
@@ -31,7 +33,7 @@ interface Props {
  * Presentational now/next LCD — the exact markup shared by CassettePlayer and
  * the loading-screen tape. No store access; all data comes in via props.
  */
-export function TrackScreen({ now, nowTime, nowDuration, nowProgress, nowMeta, next, nextMeta }: Props) {
+export function TrackScreen({ now, nowTime, nowDuration, nowProgress, nowMeta, nowMetaFallback, next, nextMeta }: Props) {
   return (
     <div className="np-screen">
       <div className="np-screen-inner">
@@ -93,8 +95,9 @@ export function TrackScreen({ now, nowTime, nowDuration, nowProgress, nowMeta, n
             </div>
           ) : (
             // A real track without meta is still being analyzed — say so
-            // instead of the broken-feeling "NO DATA".
-            <div className="np-screen-meta np-screen-meta--empty">{now ? 'ANALYZING…' : 'NO DATA'}</div>
+            // instead of the broken-feeling "NO DATA" (unless the caller knows
+            // better, e.g. NO PREVIEW for permanently unanalyzable tracks).
+            <div className="np-screen-meta np-screen-meta--empty">{now ? (nowMetaFallback ?? 'ANALYZING…') : 'NO DATA'}</div>
           )}
         </div>
       </div>

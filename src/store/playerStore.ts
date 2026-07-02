@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { Cassette, PlaybackState, AudioQuality, Track } from '../types/music'
 import type { TrackFeatures } from '../services/featureCache'
 
@@ -14,9 +15,17 @@ interface PlayerState {
   currentTime: number
   duration: number
 
-  tempoFilter: number   // 0–100 (slow → fast BPM)
-  energyFilter: number  // 0–100 (low → high energy)
-  moodFilter: number    // 0–100 (sad → happy)
+  tempoFilter: number   // 0–100 target percentile (slow → fast BPM)
+  energyFilter: number  // 0–100 target percentile (low → high energy)
+  moodFilter: number    // 0–100 target percentile (sad → happy)
+
+  // A slider only filters once the USER has moved it ("touched"). The auto-snap
+  // moves slider positions to the playing track's percentiles but clears these
+  // flags — a snapped position is information, not intent. Reset on insert.
+  touchedFilters: { tempo: boolean; energy: boolean; mood: boolean }
+  markFilterTouched: (which: 'tempo' | 'energy' | 'mood') => void
+  /** Set all three slider values WITHOUT marking them touched (auto-snap). */
+  snapFilters: (tempo: number, energy: number, mood: number) => void
 
   // True when queuedTracks was re-sorted while MusicKit was mid-playback (its
   // internal 20-track window then holds the OLD order). Checked at the next
@@ -49,7 +58,7 @@ interface PlayerState {
   bulkAddFeatures: (features: TrackFeatures[]) => void
 }
 
-export const usePlayerStore = create<PlayerState>((set) => ({
+export const usePlayerStore = create<PlayerState>()(persist((set) => ({
   currentCassette: null,
   queuedTracks: [],
   baseQueue: [],
@@ -65,6 +74,11 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   energyFilter: 50,
   moodFilter: 50,
 
+  touchedFilters: { tempo: false, energy: false, mood: false },
+  markFilterTouched: (which) => set((s) => ({ touchedFilters: { ...s.touchedFilters, [which]: true } })),
+  snapFilters: (tempo, energy, mood) =>
+    set({ tempoFilter: tempo, energyFilter: energy, moodFilter: mood, touchedFilters: { tempo: false, energy: false, mood: false } }),
+
   queueDirty: false,
   setQueueDirty: (dirty) => set({ queueDirty: dirty }),
 
@@ -75,7 +89,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setInsertSourceRect: (rect) => set({ insertSourceRect: rect }),
 
   insertCassette: (cassette) =>
-    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [], queueDirty: false }),
+    set({ currentCassette: cassette, isInserted: true, currentTrackIndex: 0, playbackState: 'stopped', queuedTracks: [], baseQueue: [], queueDirty: false, touchedFilters: { tempo: false, energy: false, mood: false } }),
 
   setQueuedTracks: (tracks) => set({ queuedTracks: tracks }),
   setBaseQueue: (tracks) => set({ baseQueue: tracks }),
@@ -94,17 +108,37 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setEnergyFilter: (value) => set({ energyFilter: value }),
   setMoodFilter: (value) => set({ moodFilter: value }),
 
+  // analyzedCount counts REAL analyses only — unanalyzable tombstones live in
+  // featuresMap (so lookups know about them) but don't count as data.
   addFeatures: (features) =>
     set((s) => {
+      const prev = s.featuresMap.get(features.id)
       const next = new Map(s.featuresMap)
       next.set(features.id, features)
-      return { featuresMap: next, analyzedCount: next.size }
+      const delta = (features.unanalyzable ? 0 : 1) - (prev && !prev.unanalyzable ? 1 : 0)
+      return { featuresMap: next, analyzedCount: s.analyzedCount + delta }
     }),
 
   bulkAddFeatures: (features) =>
     set((s) => {
       const next = new Map(s.featuresMap)
-      for (const f of features) next.set(f.id, f)
-      return { featuresMap: next, analyzedCount: next.size }
+      let count = s.analyzedCount
+      for (const f of features) {
+        const prev = next.get(f.id)
+        next.set(f.id, f)
+        count += (f.unanalyzable ? 0 : 1) - (prev && !prev.unanalyzable ? 1 : 0)
+      }
+      return { featuresMap: next, analyzedCount: count }
     }),
+}), {
+  // Session persistence: only knobs the user set survive a reload — volume +
+  // slider positions. Everything transient (queue, playback, featuresMap —
+  // which is a Map and lives in IndexedDB anyway) stays out.
+  name: 'kassette-player',
+  partialize: (s) => ({
+    volume: s.volume,
+    tempoFilter: s.tempoFilter,
+    energyFilter: s.energyFilter,
+    moodFilter: s.moodFilter,
+  }),
 }))
