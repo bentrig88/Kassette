@@ -23,8 +23,10 @@ interface WorkerResponse {
 }
 
 // Global seq + pending map — reqIds are unique across all workers in the pool.
+// Each entry records its owning worker so a worker-level failure only rejects
+// that worker's in-flight requests, not the whole pool's.
 let seq = 0
-const pending = new Map<number, { resolve: (f: TrackFeatures) => void; reject: (e: unknown) => void }>()
+const pending = new Map<number, { resolve: (f: TrackFeatures) => void; reject: (e: unknown) => void; worker: Worker }>()
 
 // Worker pool
 const POOL_SIZE = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))
@@ -42,9 +44,13 @@ function makeWorker(): Worker {
     else entry.reject(new Error(error ?? 'analysis failed'))
   }
   w.onerror = (e) => {
-    // A worker-level failure can't be tied to one request — fail them all.
-    for (const { reject } of pending.values()) reject(e.error ?? new Error('analysis worker error'))
-    pending.clear()
+    // A worker-level failure can't be tied to ONE request, but it can be tied
+    // to this worker — reject only its in-flight requests; siblings continue.
+    for (const [reqId, entry] of pending) {
+      if (entry.worker !== w) continue
+      pending.delete(reqId)
+      entry.reject(e.error ?? new Error('analysis worker error'))
+    }
   }
   return w
 }
@@ -78,7 +84,8 @@ export async function analyzeAudioBuffer(id: string, buffer: AudioBuffer): Promi
   const samples = await toMonoPCM(buffer)
   const reqId = ++seq
   return new Promise<TrackFeatures>((resolve, reject) => {
-    pending.set(reqId, { resolve, reject })
-    nextWorker().postMessage({ reqId, id, samples, sampleRate: TARGET_RATE }, [samples.buffer])
+    const worker = nextWorker()
+    pending.set(reqId, { resolve, reject, worker })
+    worker.postMessage({ reqId, id, samples, sampleRate: TARGET_RATE }, [samples.buffer])
   })
 }

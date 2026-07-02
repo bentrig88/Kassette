@@ -103,16 +103,20 @@ export function GenreBackground({ isInserting }: GenreBackgroundProps) {
     }
   }, [cassettes, selectedIndex, n])
 
+  const visible = !isInserted && !isInserting
+
+  // Only track the mouse while the background is actually visible — otherwise
+  // every mousemove keeps driving the parallax springs behind an opacity-0
+  // layer (pure CPU waste during playback).
   useEffect(() => {
+    if (!visible) return
     function onMove(e: MouseEvent) {
       mvX.set((e.clientX / window.innerWidth) * 2 - 1)
       mvY.set((e.clientY / window.innerHeight) * 2 - 1)
     }
     window.addEventListener('mousemove', onMove)
     return () => window.removeEventListener('mousemove', onMove)
-  }, [mvX, mvY])
-
-  const visible = !isInserted && !isInserting
+  }, [mvX, mvY, visible])
 
   return (
     <AnimatePresence>
